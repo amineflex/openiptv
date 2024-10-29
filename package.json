@@ -1,0 +1,49 @@
+{
+  "name": "openiptvclient",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "build": "webpack",
+    "dev": "webpack && electron .",
+    "serve": "webpack serve"
+  },
+  "author": "amineflex",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "@babel/preset-react": "^7.25.9",
+    "assert": "^2.1.0",
+    "autoprefixer": "^10.4.20",
+    "babel-loader": "^9.2.1",
+    "browserify-fs": "^1.0.0",
+    "crypto-browserify": "^3.12.1",
+    "css-loader": "^7.1.2",
+    "electron": "^33.0.2",
+    "install": "^0.13.0",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "postcss": "^8.4.47",
+    "postcss-loader": "^8.1.1",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^3.4.14",
+    "util": "^0.12.5",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.1.0"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.0",
+    "@heroicons/react": "^2.1.5",
+    "@tailwindcss/forms": "^0.5.9",
+    "electron-store": "^10.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.27.0"
+  }
+}
