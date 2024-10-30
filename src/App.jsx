@@ -4,14 +4,17 @@ import { HashRouter as Router, Routes, Route } from "react-router-dom";
 
 // Pages
 import Home from './pages/Home';
-import Settings from './pages/Settings';
+import Menu from './pages/Menu';
+import LiveTv from './pages/LiveTv';
 
 export default function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/menu/:id" element={<Menu />} />
+        <Route path="/menu/:id/tv" element={<LiveTv />} />
+
       </Routes>
     </Router>
   );

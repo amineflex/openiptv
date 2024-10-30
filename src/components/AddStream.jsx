@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { PlusIcon, TvIcon, TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { Link } from 'react-router-dom';
 
 export default function EditStream() {
   const [isOpen, setIsOpen] = useState(false);
@@ -69,7 +70,6 @@ export default function EditStream() {
 
   return (
     <>
-     
         {streams.map((stream, i) => (
           <div 
           key={i} 
@@ -86,15 +86,13 @@ export default function EditStream() {
               >
                 <PencilIcon className="h-5 w-5" />
               </button>
-            <TvIcon className="mx-auto h-8 w-8 text-secondary mb-2" />
-            <p className="text-lg font-semibold text-primary-800">{stream.name}</p>
-            <p className="text-sm text-dark-800">{stream.domain}</p>
-            <div className=" justify-center gap-4 mt-4">
+            <Link to={`/menu/${i}`}>
+              <TvIcon className="mx-auto h-8 w-8 text-secondary mb-2" />
+              <p className="text-lg font-semibold text-primary-800">{stream.name}</p>
+              <p className="text-sm text-dark-800">{stream.domain}</p>
+            </Link>
 
-
-
-
-            </div>
+   
           </div>
         ))}
 
@@ -125,7 +123,7 @@ export default function EditStream() {
                       placeholder={input.placeholder}
                       value={formData[input.name]}
                       onChange={handleInputChange}
-                      className="block w-full rounded-md py-1.5 pr-20 bg-dark border-1 border-dark-100 text-secondary/80 ring-0 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
+                      className="block w-full rounded-md py-1.5 bg-dark border-1 border-dark-100 text-secondary/80 ring-0 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
                     />
                   </div>
                 </div>
