@@ -11,16 +11,16 @@ export default function LiveTv() {
     const stream = useStreamLoader(id);
     const categories = useLiveCategories(stream);
 
-    const [selectedCategory, setSelectedCategory] = useState(null); // Catégorie sélectionnée par défaut est null
-    const [channels, setChannels] = useState([]); // Chaînes de la catégorie sélectionnée
-    const [loading, setLoading] = useState(false); // État de chargement
+    const [selectedCategory, setSelectedCategory] = useState(null); 
+    const [channels, setChannels] = useState([]); 
+    const [loading, setLoading] = useState(false); 
 
-    // Fonction pour charger les chaînes selon la catégorie
+    
     useEffect(() => {
         const fetchChannels = async () => {
-            if (stream && selectedCategory) { // Ne charge les chaînes que si une catégorie est sélectionnée
+            if (stream && selectedCategory) { 
                 setLoading(true);
-                const data = selectedCategory.category_id === 0 // Vérifie si All Channels est sélectionné
+                const data = selectedCategory.category_id === 0 
                     ? await apiService.fetchAllChannels(stream)
                     : await apiService.fetchLiveStreamsByCategory(stream, selectedCategory.category_id);
                 
@@ -51,8 +51,8 @@ export default function LiveTv() {
 
                     {/* All channels cat */}
                     <div
-                        onClick={() => setSelectedCategory({ category_id: undefined, category_name: "All Channels" })} // Définit "All Channels" comme sélectionné
-                        className={`my-2 p-2 rounded-xl truncate cursor-pointer ${selectedCategory?.category_id === undefined ? 'border border-secondary bg-dark' : 'bg-dark'}`}
+                        onClick={() => setSelectedCategory({ category_id: "all", category_name: "All Channels" })} // Définit "All Channels" comme sélectionné
+                        className={`my-2 p-2 rounded-xl truncate cursor-pointer ${selectedCategory?.category_id === "all" ? 'border border-secondary bg-dark' : 'bg-dark'}`}
                     >
                         <h2 className="text-md font-semibold">All Channels</h2>
                     </div>
@@ -78,7 +78,25 @@ export default function LiveTv() {
                             </h1>
                             
                             {loading ? (
-                                <p className="text-xl text-center text-secondary">Loading...</p>
+
+                                <div className='h-full flex items-center justify-center'>
+                                    <p className="text-2xl text-center text-secondary-400 inline-flex justify-center items-center">
+                                        <svg
+                                            fill="none"
+                                            className="w-10 h-10 mr-2 animate-spin"
+                                            viewBox="0 0 32 32"
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            <path
+                                            clipRule="evenodd"
+                                            d="M15.165 8.53a.5.5 0 01-.404.58A7 7 0 1023 16a.5.5 0 011 0 8 8 0 11-9.416-7.874.5.5 0 01.58.404z"
+                                            fill="currentColor"
+                                            fillRule="evenodd"
+                                            />
+                                        </svg>
+                                        <span>Loading...</span>
+                                    </p>
+                                </div>
                             ) : (
                                 <div className="grid grid-cols-3 gap-4">
                                     {channels.map((channel) => (
@@ -101,7 +119,11 @@ export default function LiveTv() {
                             )}
                         </>
                     ) : (
-                        <p className="text-xl text-center mb-6">Select a category to explore</p> 
+                        <div className='h-full flex items-center justify-center'>
+                        <p className="text-2xl text-center text-secondary inline-flex justify-center items-center">
+                            <p className="mb-6">Select a category to explore</p> 
+                        </p>
+                    </div>
                     )}
                 </div>    
             </div>
