@@ -6,6 +6,8 @@ import { apiService } from '../services/apiService';
 import NotFound from '../components/NotFound';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
+import { generateStreamUrl } from '../services/streamService';
+
 export default function LiveTv() {
     const { id } = useParams();
     const stream = useStreamLoader(id);
@@ -102,7 +104,7 @@ export default function LiveTv() {
                                     {channels.map((channel) => (
                                         <Link
                                             key={channel.stream_id}
-                                            to={`/player/${channel.stream_id}`}
+                                            to={`/watch?src=${generateStreamUrl(stream.domain, stream.username, stream.password, channel.stream_id)}&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
                                             className="p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary"
                                         >
                                             <img
