@@ -6,6 +6,8 @@ import { HashRouter as Router, Routes, Route } from "react-router-dom";
 import Home from './pages/Home';
 import Menu from './pages/Menu';
 import LiveTv from './pages/LiveTv';
+import Player from './pages/Player';
+
 
 export default function App() {
   return (
@@ -14,6 +16,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/menu/:id" element={<Menu />} />
         <Route path="/menu/:id/tv" element={<LiveTv />} />
+
+        <Route path="/player" element={<Player />} />
 
       </Routes>
     </Router>

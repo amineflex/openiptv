@@ -52,7 +52,7 @@ export default function LiveTv() {
                     {/* All channels cat */}
                     <div
                         onClick={() => setSelectedCategory({ category_id: "all", category_name: "All Channels" })} // Définit "All Channels" comme sélectionné
-                        className={`my-2 p-2 rounded-xl truncate cursor-pointer ${selectedCategory?.category_id === "all" ? 'border border-secondary bg-dark' : 'bg-dark'}`}
+                        className={`my-2 p-2 rounded-xl truncate cursor-pointer ${selectedCategory?.category_id === "all" ? 'border-2 border-secondary-400 bg-dark' : 'bg-dark'}`}
                     >
                         <h2 className="text-md font-semibold">All Channels</h2>
                     </div>
@@ -62,7 +62,7 @@ export default function LiveTv() {
                         <div
                             key={category.id}
                             onClick={() => setSelectedCategory(category)}
-                            className={`my-2 p-2 rounded-xl truncate cursor-pointer ${selectedCategory?.category_id === category.category_id ? 'border border-secondary bg-dark' : 'bg-dark'}`}
+                            className={`my-2 p-2 rounded-xl truncate cursor-pointer ${selectedCategory?.category_id === category.category_id ? 'border-2 border-secondary-400 bg-dark' : 'bg-dark'}`}
                         >
                             <h2 className="text-md font-semibold">{category.category_name}</h2>
                         </div>
@@ -98,7 +98,7 @@ export default function LiveTv() {
                                     </p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
                                     {channels.map((channel) => (
                                         <Link
                                             key={channel.stream_id}
@@ -111,7 +111,10 @@ export default function LiveTv() {
                                                 className="rounded-xl mb-4"
                                                 style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'cover' }} 
                                             />
-                                            <h3 className="text-lg font-semibold">{channel.name}</h3>
+                                            <h3 className="text-lg font-semibold">
+                                                <span className="text-dark bg-secondary-400 rounded-full px-2 mr-2">{channel.num}</span>
+                                                <span >{channel.name}</span>
+                                            </h3>
                                             <p className="text-sm">{selectedCategory.category_name}</p>
                                         </Link>
                                     ))}
