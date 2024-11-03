@@ -73,24 +73,18 @@ export default function Movies() {
                             <LoadingSpinner />
                         ) : (
                             <div>
-                                <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
+                                <div className="grid md:grid-cols-4 grid-cols-2 gap-4">
                                     {vods.slice(0, visibleCount).map((vod) => (
                                         <Link
                                             key={vod.stream_id}
                                             to={`/watch?src=${generateStreamUrl(stream.domain, "movie", stream.username, stream.password, vod.stream_id, vod.container_extension)}&channel=${vod.name}&icon=${vod.stream_icon}&category=${selectedVodCategory.category_name}`}
-                                            className="p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary"
+                                            style={{ backgroundImage: `url(${vod.stream_icon || "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png"})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', height: '300px', width: '200px', borderRadius: '1rem', transition: 'transform 0.3s ease-in-out' }}
+                                            className="group bg-dark bg-cover bg-center bg-no-repeat rounded-xl flex items-end hover:transform hover:scale-105 border-2 border-transparent hover:border-secondary-400/75 hover:shadow-secondary-400/50"
                                         >
-                                            <img
-                                                src={vod.stream_icon || "https://picsum.photos/200/300"}
-                                                alt={vod.name}
-                                                className="rounded-xl mb-4"
-                                                style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'cover' }}
-                                            />
-                                            <h3 className="text-lg font-semibold">
-                                                <span className="text-dark bg-secondary-400 rounded-full px-2 mr-2">{vod.num}</span>
-                                                <span>{vod.name}</span>
-                                            </h3>
-                                            <p className="text-sm">{selectedVodCategory.category_name}</p>
+                                            <div className='bg-gradient-to-t from-dark/75 to-transparent p-4 pt-10 group-hover:hidden duration-300'>
+                                                <h2 className="text-lg font-semibold text-white/90">{vod.name}</h2>
+                                                <span className="text-sm">{vod.rating}/10</span>
+                                            </div>
                                         </Link>
                                     ))}
                                 </div>

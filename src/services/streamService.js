@@ -1,9 +1,7 @@
 import mpegts from "mpegts.js";
 
 export function generateStreamUrl(domain, type, username, password, channelId, containerExtension) {
-  const url =  `${domain}/${type}/${username}/${password}/${channelId}.${containerExtension}`;
-  console.log(url);
-  return url
+  return `${domain}/${type}/${username}/${password}/${channelId}.${containerExtension}`; 
 }
 
 export function startStream(videoElement, streamUrl) {

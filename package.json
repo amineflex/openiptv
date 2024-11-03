@@ -54,6 +54,7 @@
     "babel-core": "^6.26.3",
     "babel-preset-env": "^1.7.0",
     "electron-forge": "^5.2.4",
+    "hls.js": "^1.5.17",
     "mpegts.js": "^1.7.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

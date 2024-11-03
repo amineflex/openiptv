@@ -20,10 +20,21 @@ export default function Player({ streamUrl, channelInfo }) {
     };
   }, [streamUrl]);
 
+  useEffect(() => {
+    if (isHovered) {
+      const timer = setTimeout(() => {
+        setIsHovered(false);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isHovered]);
+
   return (
     <div
       className="relative bg-black text-secondary min-h-screen flex items-center justify-center"
       onMouseEnter={() => setIsHovered(true)}
+      onMouseMove={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {isHovered && (
