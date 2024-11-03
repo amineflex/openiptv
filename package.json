@@ -51,6 +51,8 @@
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.1.5",
     "@tailwindcss/forms": "^0.5.9",
+    "babel-core": "^6.26.3",
+    "babel-preset-env": "^1.7.0",
     "electron-forge": "^5.2.4",
     "mpegts.js": "^1.7.3",
     "react": "^18.3.1",

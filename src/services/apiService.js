@@ -11,11 +11,11 @@ export const apiService = {
             if (response.ok) {
                 return await response.json();
             } else {
-                console.error("Erreur lors de la récupération des catégories");
+                console.error("Failed to fetch live categories");
                 return null;
             }
         } catch (error) {
-            console.error("Erreur de connexion", error);
+            console.error("Connection error :", error);
             return null;
         }
     },
@@ -32,33 +32,14 @@ export const apiService = {
             if (response.ok) {
                 return await response.json();
             } else {
-                console.error("Erreur lors de la récupération des chaînes");
+                console.error("Failed to fetch live streams by category");
                 return null;
             }
         } catch (error) {
-            console.error("Erreur de connexion", error);
+            console.error("Connection error :", error);
             return null;
         }
     },
 
-    fetchAllChannels: async (stream) => {
-        const url = `${stream.url}/player_api.php?username=${stream.username}&password=${stream.password}&action=get_live_streams&category_id=1`;
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'User-Agent': 'IPTVClient/1.0',
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (response.ok) {
-                return await response.json();
-            } else {
-                console.error("Erreur lors de la récupération de toutes les chaînes");
-                return null;
-            }
-        } catch (error) {
-            console.error("Erreur de connexion", error);
-            return null;
-        }
-    }
+   
 };
