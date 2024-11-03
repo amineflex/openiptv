@@ -8,7 +8,6 @@ export default function CategoryList({ categories, selectedCategory, handleCateg
             {/* Back to Menu Link */}
             <Link to={backLink} className="text-secondary/75 text-sm font-semibold inline-flex items-center rounded-xl bg-primary/10 hover:bg-primary-100 w-full py-0.5 px-2 my-1">
                 <ArrowLeftIcon className="h-4 w-4 mr-2 text-secondary-400 " />
-                <span>Back to Menu</span>
             </Link>
 
             <h1 className="text-3xl text-center font-bold mb-4">{title}</h1>

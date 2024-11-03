@@ -13,9 +13,12 @@ export default function LiveTv() {
     const stream = useStreamLoader(id);
     const categories = useLiveCategories(stream);
 
+    const limit = 200;
+
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [channels, setChannels] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(limit); 
 
     useEffect(() => {
         const savedCategory = localStorage.getItem('selectedCategory');
@@ -39,6 +42,10 @@ export default function LiveTv() {
     const handleCategorySelect = (category) => {
         setSelectedCategory(category);
         localStorage.setItem('selectedCategory', JSON.stringify(category));
+    };
+
+    const handleLoadMore = () => {
+        setVisibleCount(prevCount => prevCount + limit); 
     };
 
     if (!stream) {
@@ -65,26 +72,40 @@ export default function LiveTv() {
                         {loading ? (
                             <LoadingSpinner />
                         ) : (
-                            <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
-                                {channels.map((channel) => (
-                                    <Link
-                                        key={channel.stream_id}
-                                        to={`/watch?src=${generateStreamUrl(stream.domain, stream.username, stream.password, channel.stream_id)}&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
-                                        className="p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary"
-                                    >
-                                        <img
-                                            src={channel.stream_icon || "https://picsum.photos/200/300"}
-                                            alt={channel.name}
-                                            className="rounded-xl mb-4"
-                                            style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'cover' }}
-                                        />
-                                        <h3 className="text-lg font-semibold">
-                                            <span className="text-dark bg-secondary-400 rounded-full px-2 mr-2">{channel.num}</span>
-                                            <span>{channel.name}</span>
-                                        </h3>
-                                        <p className="text-sm">{selectedCategory.category_name}</p>
-                                    </Link>
-                                ))}
+                            <div>
+                                <div className="grid md:grid-cols-3 grid-cols-1 gap-4">
+                                    {channels.slice(0, visibleCount).map((channel) => (
+                                        <Link
+                                            key={channel.stream_id}
+                                            to={`/watch?src=${generateStreamUrl(stream.domain, "live", stream.username, stream.password, channel.stream_id, "ts")}&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
+                                            className="p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary"
+                                        >
+                                            <img
+                                                src={channel.stream_icon || "https://picsum.photos/200/300"}
+                                                alt={channel.name}
+                                                className="rounded-xl mb-4"
+                                                style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'cover' }}
+                                            />
+                                            <h3 className="text-lg font-semibold">
+                                                <span className="text-dark bg-secondary-400 rounded-full px-2 mr-2">{channel.num}</span>
+                                                <span>{channel.name}</span>
+                                            </h3>
+                                            <p className="text-sm">{selectedCategory.category_name}</p>
+                                        </Link>
+                                    ))}
+                                </div>
+
+                                {/* Load More  */}
+                                {visibleCount < channels.length && (
+                                    <div className="flex justify-center mt-6">
+                                        <button
+                                            onClick={handleLoadMore}
+                                            className="px-6 py-2 text-secondary bg-secondary-400/10 rounded-xl hover:text-secondary-400 hover:bg-secondary-400/25"
+                                        >
+                                            Load More
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>

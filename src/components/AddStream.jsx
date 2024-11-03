@@ -21,7 +21,7 @@ export default function EditStream() {
     { label: 'Password', type: 'password', name: 'password', placeholder: '************' }
   ];
 
-  // Charger les streams depuis le localStorage
+  // Load streams
   useEffect(() => {
     const storedStreams = JSON.parse(localStorage.getItem("streams")) || [];
     setStreams(storedStreams);
@@ -32,24 +32,22 @@ export default function EditStream() {
     setFormData((prevData) => ({ ...prevData, [name]: value }));
   };
 
-  // Sauvegarder ou éditer un flux
+  // Add/edit stream
   const saveCredentials = () => {
     let updatedStreams;
     
     if (editIndex !== null) {
-      // Mise à jour d'un flux existant
       updatedStreams = streams.map((stream, i) =>
         i === editIndex ? { ...formData, datetime_added: stream.datetime_added } : stream
       );
     } else {
-      // Ajout d'un nouveau flux
       updatedStreams = [...streams, { ...formData, datetime_added: new Date().toISOString() }];
     }
     
     setStreams(updatedStreams);
     localStorage.setItem("streams", JSON.stringify(updatedStreams));
 
-    // Réinitialiser le formulaire et fermer le dialog
+    // Reset form
     setFormData({ name: '', domain: '', username: '', password: '' });
     setIsOpen(false);
     setEditIndex(null);

@@ -52,10 +52,10 @@ export default function Menu() {
                         <TvIcon className="h-8 w-8 mr-2" />
                         Live TV
                     </Link>
-                    <div className="h-96 bg-blue-400 rounded-xl text-center text-xl justify-center flex items-center">
+                    <Link to={`movies`} className="h-96 bg-blue-400 rounded-xl text-center text-xl justify-center flex items-center">
                         <FilmIcon className="h-8 w-8 mr-2" />
                         Movies
-                    </div>
+                    </Link>
                     <div className="h-96 bg-orange-400 rounded-xl text-center text-xl justify-center flex items-center">
                         <VideoCameraIcon className="h-8 w-8 mr-2" />
                         Series 
