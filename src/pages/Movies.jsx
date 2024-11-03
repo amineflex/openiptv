@@ -3,7 +3,7 @@ import React from 'react';
 
 export default function Movies() {
     return (
-        <div>
+        <div className='bg-dark '>
             <h1>Movies</h1>
         </div>
     )
