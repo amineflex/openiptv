@@ -27,7 +27,7 @@ export default function Player({ streamUrl, channelInfo }) {
       onMouseLeave={() => setIsHovered(false)}
     >
       {isHovered && (
-        <div className="absolute top-4 left-4 bg-black/70 text-white p-4 rounded-lg flex items-center space-x-4 z-50">
+        <div className="absolute top-4 left-4 bg-dark/75 text-white p-4 rounded-lg flex items-center space-x-4 z-50">
           <button onClick={() => history.back()} className=" p-2 hover:bg-primary/30 rounded-full group">
             <ArrowLeftIcon className="h-6 w-6 text-white group-hover:text-secondary-400" />
           </button>
