@@ -6,7 +6,6 @@ import NotFound from "../components/NotFound";
 import { useVodCategories } from "../hooks/useLiveCategories";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
-import { generateStreamUrl } from "../services/streamService";
 
 export default function Movies() {
 	const { id } = useParams();
@@ -73,11 +72,12 @@ export default function Movies() {
 							<LoadingSpinner />
 						) : (
 							<div>
-								<div className="grid md:grid-cols-4 grid-cols-2 gap-4">
+								<div className="flex flex-wrap gap-4">
 									{vods.slice(0, visibleCount).map((vod) => (
 										<Link
 											key={vod.stream_id}
-											to={`/watch?src=${generateStreamUrl(stream.domain, "movie", stream.username, stream.password, vod.stream_id, vod.container_extension)}&type=vod&channel=${vod.name}&icon=${vod.stream_icon}&category=${selectedVodCategory.category_name}`}
+											// to={`/watch?src=${generateStreamUrl(stream.domain, "movie", stream.username, stream.password, vod.stream_id, vod.container_extension)}&type=vod&channel=${vod.name}&icon=${vod.stream_icon}&category=${selectedVodCategory.category_name}`}
+											to={`v/${vod.stream_id}`}
 											style={{
 												backgroundImage: `url(${vod.stream_icon || "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png"})`,
 												backgroundSize: "cover",

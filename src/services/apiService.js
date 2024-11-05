@@ -85,5 +85,30 @@ export const apiService = {
 			console.error("Connection error:", error);
 			return null;
 		}
-	}
+	},
+
+	// Fetch VOD info
+	fetchVodInfo: async (stream, vodId) => {
+        const url = `${stream.domain}/player_api.php?username=${stream.username}&password=${stream.password}&action=get_vod_info&vod_id=${vodId}`;
+        
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'IPTVClient/1.0',
+                    'Content-Type': 'application/json'
+                }
+            });
+			
+
+            if (response.ok) {
+                return await response.json();
+            } else {
+                console.error("Failed to fetch VOD info");
+                return null;
+            }
+        } catch (error) {
+            console.error("Connection error:", error);
+            return null;
+        }
+    },
 };
