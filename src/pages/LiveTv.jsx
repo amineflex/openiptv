@@ -78,7 +78,7 @@ export default function LiveTv() {
                                         <Link
                                             key={channel.stream_id}
                                             to={`/watch?src=${generateStreamUrl(stream.domain, "live", stream.username, stream.password, channel.stream_id, "ts")}&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
-                                            className="p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary"
+                                            className="group p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary border-2 border-transparent hover:border-secondary-400 hover:bg-primary/20 duration-150"
                                         >
                                             <img
                                                 src={channel.stream_icon || "https://picsum.photos/200/300"}
