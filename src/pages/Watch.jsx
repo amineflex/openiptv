@@ -8,6 +8,7 @@ export default function Watch() {
 	const queryParams = new URLSearchParams(location.search);
 	const streamUrl = queryParams.get("src");
 	const channelInfo = {
+		type: queryParams.get("type"),
 		name: queryParams.get("channel"),
 		category: queryParams.get("category"),
 		icon: queryParams.get("icon")

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { useStreamLoader } from "../hooks/useStreamLoader";
-import { useVodCategories } from "../hooks/useLiveCategories";
-import { apiService } from "../services/apiService";
-import NotFound from "../components/NotFound";
+import React, { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import CategoryList from "../components/CategoryList";
 import LoadingSpinner from "../components/LoadingSpinner";
+import NotFound from "../components/NotFound";
+import { useVodCategories } from "../hooks/useLiveCategories";
+import { useStreamLoader } from "../hooks/useStreamLoader";
+import { apiService } from "../services/apiService";
 import { generateStreamUrl } from "../services/streamService";
 
 export default function Movies() {
@@ -77,7 +77,7 @@ export default function Movies() {
 									{vods.slice(0, visibleCount).map((vod) => (
 										<Link
 											key={vod.stream_id}
-											to={`/watch?src=${generateStreamUrl(stream.domain, "movie", stream.username, stream.password, vod.stream_id, vod.container_extension)}&channel=${vod.name}&icon=${vod.stream_icon}&category=${selectedVodCategory.category_name}`}
+											to={`/watch?src=${generateStreamUrl(stream.domain, "movie", stream.username, stream.password, vod.stream_id, vod.container_extension)}&type=vod&channel=${vod.name}&icon=${vod.stream_icon}&category=${selectedVodCategory.category_name}`}
 											style={{
 												backgroundImage: `url(${vod.stream_icon || "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png"})`,
 												backgroundSize: "cover",

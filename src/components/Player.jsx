@@ -1,6 +1,6 @@
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import React, { useEffect, useRef, useState } from "react";
 import { startStream } from "../services/streamService";
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 
 export default function Player({ streamUrl, channelInfo }) {
 	const videoRef = useRef(null);
@@ -9,15 +9,18 @@ export default function Player({ streamUrl, channelInfo }) {
 	useEffect(() => {
 		let player;
 
-		if (videoRef.current) {
+		if (videoRef.current && channelInfo.type === "live_tv") {
 			player = startStream(videoRef.current, streamUrl);
-		}
 
-		return () => {
-			if (player) {
-				player.destroy();
-			}
-		};
+			return () => {
+				if (player) {
+					player.destroy();
+				}
+			};
+		} else if (videoRef.current && channelInfo.type === "vod") {
+			videoRef.current.src = streamUrl;
+			videoRef.current.play();
+		}
 	}, [streamUrl]);
 
 	useEffect(() => {
@@ -52,7 +55,13 @@ export default function Player({ streamUrl, channelInfo }) {
 				</div>
 			)}
 
-			<video ref={videoRef} controls style={{ width: "100%", height: "100%" }} autoPlay />
+			<video
+				ref={videoRef}
+				controls
+				style={{ width: "100%", height: "100%" }}
+				autoPlay
+				className={channelInfo.type === "live_tv" ? "live_tv" : ""}
+			/>
 		</div>
 	);
 }

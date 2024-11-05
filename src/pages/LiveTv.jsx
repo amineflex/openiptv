@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { useStreamLoader } from "../hooks/useStreamLoader";
-import { useLiveCategories } from "../hooks/useLiveCategories";
-import { apiService } from "../services/apiService";
-import NotFound from "../components/NotFound";
+import React, { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import CategoryList from "../components/CategoryList";
 import LoadingSpinner from "../components/LoadingSpinner";
+import NotFound from "../components/NotFound";
+import { useLiveCategories } from "../hooks/useLiveCategories";
+import { useStreamLoader } from "../hooks/useStreamLoader";
+import { apiService } from "../services/apiService";
 import { generateStreamUrl } from "../services/streamService";
 
 export default function LiveTv() {
@@ -77,7 +77,7 @@ export default function LiveTv() {
 									{channels.slice(0, visibleCount).map((channel) => (
 										<Link
 											key={channel.stream_id}
-											to={`/watch?src=${generateStreamUrl(stream.domain, "live", stream.username, stream.password, channel.stream_id, "ts")}&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
+											to={`/watch?src=${generateStreamUrl(stream.domain, "live", stream.username, stream.password, channel.stream_id, "ts")}&type=live_tv&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
 											className="group p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary border-2 border-transparent hover:border-secondary-400 hover:bg-primary/20 duration-150"
 										>
 											<img

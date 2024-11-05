@@ -33,6 +33,6 @@
 	background-color: #474973;
 }
 
-video::-webkit-media-controls-timeline {
+.live_tv::-webkit-media-controls-timeline {
 	display: none;
 }
