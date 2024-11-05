@@ -4,35 +4,35 @@
 
 /* scrollbar */
 *::-webkit-scrollbar {
-    height: 10px;
-    width: 6px;
-  }
-  *::-webkit-scrollbar-track {
-    border-radius: 5px;
-    background-color: #131125;
-  }
-  
-  *::-webkit-scrollbar-track:hover {
-    background-color: #0d0c1d;
-  }
-  
-  *::-webkit-scrollbar-track:active {
-    background-color: #0d0c1d;
-  }
-  
-  *::-webkit-scrollbar-thumb {
-    border-radius: 5px;
-    background-color: #0d0c1d;
-  }
-  
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: #5f629a;
-  }
-  
-  *::-webkit-scrollbar-thumb:active {
-    background-color: #474973;
-  }
+	height: 10px;
+	width: 6px;
+}
+*::-webkit-scrollbar-track {
+	border-radius: 5px;
+	background-color: #131125;
+}
+
+*::-webkit-scrollbar-track:hover {
+	background-color: #0d0c1d;
+}
+
+*::-webkit-scrollbar-track:active {
+	background-color: #0d0c1d;
+}
+
+*::-webkit-scrollbar-thumb {
+	border-radius: 5px;
+	background-color: #0d0c1d;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background-color: #5f629a;
+}
+
+*::-webkit-scrollbar-thumb:active {
+	background-color: #474973;
+}
 
 video::-webkit-media-controls-timeline {
-    display: none;
+	display: none;
 }
