@@ -61,7 +61,7 @@ export default function Player({ streamUrl, channelInfo }) {
 				ref={videoRef}
 				controls
 				style={{ width: "100%", height: "100%" }}
-				autoPlay
+				autoPlay={channelInfo.type === "live_tv" ? true : false}
 				className={channelInfo.type === "live_tv" ? "live_tv" : ""}
 			/>
 		</div>

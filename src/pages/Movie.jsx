@@ -57,7 +57,7 @@ return (
                 </div>
 
             </div>
-            <header className="flex flex-row max-w-4xl mx-auto pb-10 gap-6">
+            <header className="flex flex-row md:max-w-4xl mx-auto pb-10 gap-6">
                 <div className="flex justify-center flex-col items-center gap-2 z-50">
                     <img src={movieInfo.info.cover_big} alt={movieInfo.info.name} className="max-w-full min-w-64 h-auto rounded-b-lg shadow-lg rounded-lg -mt-48" />
                     <button className="bg-primary/20 hover:bg-primary/40 text-white p-2 rounded-lg text-lg font-semibold text-center w-full">Show Trailer</button>
@@ -65,10 +65,15 @@ return (
                 <div>
                     <h1 className="text-4xl font-bold text-white mb-4">{movieInfo.info.name || "Movie"}</h1>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-2 gap-2 flex flex-col">
                             <p className="text-lg">#{movieId}</p>
-                            <p className="text-lg"><strong>Genre:</strong> {movieInfo.info.genre}</p>
-                            <p className="text-lg"><strong>Plot:</strong> {movieInfo.info.plot}</p>
+                            <p className="text-lg"> {movieInfo.info.plot}</p>
+                            <p className="text-md">
+                                 {movieInfo.info.genre.split(", ").map((genre, index) => (
+                                    <span key={index} className="bg-secondary-400/25 text-secondary-400 py-1 px-2 rounded-xl mr-2">{genre}</span>
+                                ))
+                                 }
+                                </p>
                             <p className="text-lg"><strong>Rating:</strong> {movieInfo.info.rating}</p>
                             <p className="text-lg"><strong>Release Date:</strong> {movieInfo.info.releasedate}</p>
                         </div>
