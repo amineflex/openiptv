@@ -77,7 +77,7 @@ export default function LiveTv() {
 									{channels.slice(0, visibleCount).map((channel) => (
 										<Link
 											key={channel.stream_id}
-											to={`/watch?src=${generateStreamUrl(stream.domain, "live", stream.username, stream.password, channel.stream_id, "ts")}&type=live_tv&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
+											to={`/watch?src=${generateStreamUrl(stream.domain, "live", stream.username, stream.password, channel.stream_id, stream.settings.streamFormat)}&type=live_tv&channel=${channel.name}&icon=${channel.stream_icon}&category=${selectedCategory.category_name}`}
 											className="group p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary border-2 border-transparent hover:border-secondary-400 hover:bg-primary/20 duration-150"
 										>
 											<img
