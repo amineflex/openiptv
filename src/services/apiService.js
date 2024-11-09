@@ -5,7 +5,7 @@ export const apiService = {
 		try {
 			const response = await fetch(url, {
 				headers: {
-					"User-Agent": "IPTVClient/1.0",
+					"User-Agent": "OpenIPTV/1.0",
 					"Content-Type": "application/json"
 				}
 			});
@@ -27,7 +27,7 @@ export const apiService = {
 		try {
 			const response = await fetch(url, {
 				headers: {
-					"User-Agent": "IPTVClient/1.0",
+					"User-Agent": "OpenIPTV/1.0",
 					"Content-Type": "application/json"
 				}
 			});
@@ -49,7 +49,7 @@ export const apiService = {
 		try {
 			const response = await fetch(url, {
 				headers: {
-					"User-Agent": "IPTVClient/1.0",
+					"User-Agent": "OpenIPTV/1.0",
 					"Content-Type": "application/json"
 				}
 			});
@@ -71,7 +71,7 @@ export const apiService = {
 		try {
 			const response = await fetch(url, {
 				headers: {
-					"User-Agent": "IPTVClient/1.0",
+					"User-Agent": "OpenIPTV/1.0",
 					"Content-Type": "application/json"
 				}
 			});
@@ -93,7 +93,7 @@ export const apiService = {
 		try {
 			const response = await fetch(url, {
 				headers: {
-					"User-Agent": "IPTVClient/1.0",
+					"User-Agent": "OpenIPTV/1.0",
 					"Content-Type": "application/json"
 				}
 			});
@@ -116,7 +116,7 @@ export const apiService = {
         try {
             const response = await fetch(url, {
                 headers: {
-                    'User-Agent': 'IPTVClient/1.0',
+                    'User-Agent': 'OpenIPTV/1.0',
                     'Content-Type': 'application/json'
                 }
             });
@@ -133,4 +133,70 @@ export const apiService = {
             return null;
         }
     },
+
+	// Fetch series categories
+	fetchSeriesCategories: async (stream) => {
+		const url = `${stream.domain}/player_api.php?username=${stream.username}&password=${stream.password}&action=get_series_categories`;
+		try {
+			const response = await fetch(url, {
+				headers: {
+					"User-Agent": "OpenIPTV/1.0",
+					"Content-Type": "application/json"
+				}
+			});
+			if (response.ok) {
+				return await response.json();
+			} else {
+				console.error("Failed to fetch series categories");
+				return null;
+			}
+		} catch (error) {
+			console.error("Connection error:", error);
+			return null;
+		}
+	},
+
+	// Fetch series by category
+	fetchSeriesByCategory: async (stream, categoryId) => {
+		const url = `${stream.domain}/player_api.php?username=${stream.username}&password=${stream.password}&action=get_series&category_id=${categoryId}`;
+		try {
+			const response = await fetch(url, {
+				headers: {
+					"User-Agent": "OpenIPTV/1.0",
+					"Content-Type": "application/json"
+				}
+			});
+			if (response.ok) {
+				return await response.json();
+			} else {
+				console.error("Failed to fetch series by category");
+				return null;
+			}
+		} catch (error) {
+			console.error("Connection error:", error);
+			return null;
+		}
+	},
+
+	// Fetch series info
+	fetchSeriesInfo: async (stream, seriesId) => {
+		const url = `${stream.domain}/player_api.php?username=${stream.username}&password=${stream.password}&action=get_series_info&series_id=${seriesId}`;
+		try {
+			const response = await fetch(url, {
+				headers: {
+					"User-Agent": "OpenIPTV/1.0",
+					"Content-Type": "application/json"
+				}
+			});
+			if (response.ok) {
+				return await response.json();
+			} else {
+				console.error("Failed to fetch series info");
+				return null;
+			}
+		} catch (error) {
+			console.error("Connection error:", error);
+			return null;
+		}
+	},
 };

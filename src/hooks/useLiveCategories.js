@@ -35,3 +35,22 @@ export const useVodCategories = (stream) => {
 
 	return categories;
 };
+
+
+export const useSerieCategories = (stream) => {
+	const [categories, setCategories] = useState([]);
+
+	useEffect(() => {
+		if (stream) {
+			const fetchCategories = async () => {
+				const data = await apiService.fetchSeriesCategories(stream);
+				if (data) {
+					setCategories(data);
+				}
+			};
+			fetchCategories();
+		}
+	}, [stream]);
+
+	return categories;
+};

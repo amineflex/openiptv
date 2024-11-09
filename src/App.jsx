@@ -6,6 +6,8 @@ import Home from "./pages/Home";
 import Menu from "./pages/Menu";
 import LiveTv from "./pages/LiveTv";
 import Movies from "./pages/Movies";
+import Series from "./pages/Series";
+
 import Movie from "./pages/Movie";
 import Watch from "./pages/Watch";
 import Settings from "./pages/Settings";
@@ -19,6 +21,8 @@ export default function App() {
 				<Route path="/menu/:id/settings" element={<Settings/>} />
 				<Route path="/menu/:id/tv" element={<LiveTv />} />
 				<Route path="/menu/:id/movies" element={<Movies />} />
+				<Route path="/menu/:id/series" element={<Series />} />
+				
 				<Route path="/menu/:id/movies/v/:movieId" element={<Movie />} />
 
 

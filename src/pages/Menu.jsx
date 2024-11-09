@@ -65,10 +65,13 @@ export default function Menu() {
 						<FilmIcon className="h-8 w-8 mr-2" />
 						Movies
 					</Link>
-					<div className="h-96 bg-orange-400 rounded-xl text-center text-xl justify-center flex items-center">
+					<Link
+						to={`series`}
+						className="h-96 bg-orange-400 rounded-xl text-center text-xl justify-center flex items-center"
+					>
 						<VideoCameraIcon className="h-8 w-8 mr-2" />
 						Series
-					</div>
+					</Link>
 					<div className="h-32 bg-indigo-400 rounded-xl col-span-2 text-center text-xl justify-center flex items-center">
 						Connected as {stream.username}
 					</div>
