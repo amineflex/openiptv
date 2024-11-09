@@ -6,7 +6,7 @@ export default function Player({ streamUrl, channelInfo }) {
 	const videoRef = useRef(null);
 	const [isHovered, setIsHovered] = useState(false);
 
-	console.log(channelInfo)
+	console.log(channelInfo, streamUrl);
 
 	useEffect(() => {
 		let player;

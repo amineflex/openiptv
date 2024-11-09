@@ -18,14 +18,12 @@ export default function App() {
 			<Routes>
 				<Route path="/" element={<Home />} />
 				<Route path="/menu/:id" element={<Menu />} />
-				<Route path="/menu/:id/settings" element={<Settings/>} />
+				<Route path="/menu/:id/settings" element={<Settings />} />
 				<Route path="/menu/:id/tv" element={<LiveTv />} />
 				<Route path="/menu/:id/movies" element={<Movies />} />
 				<Route path="/menu/:id/series" element={<Series />} />
-				
+
 				<Route path="/menu/:id/movies/v/:movieId" element={<Movie />} />
-
-
 
 				<Route path="/watch" element={<Watch />} />
 			</Routes>

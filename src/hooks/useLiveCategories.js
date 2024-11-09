@@ -36,7 +36,6 @@ export const useVodCategories = (stream) => {
 	return categories;
 };
 
-
 export const useSerieCategories = (stream) => {
 	const [categories, setCategories] = useState([]);
 

@@ -35,13 +35,14 @@ export default function EditStream() {
 	// Add/edit stream
 	const saveCredentials = () => {
 		let updatedStreams;
-	
+
 		const defaultSettings = {
-			streamFormat: ".ts", 
-			adultChannel: false, 
-			hourFormat: "24H" 
+			streamFormat: "ts",
+			adultChannel: false,
+			hourFormat: "24H",
+			maxChannelsPerCategory: 200
 		};
-	
+
 		if (editIndex !== null) {
 			updatedStreams = streams.map((stream, i) =>
 				i === editIndex
@@ -54,16 +55,15 @@ export default function EditStream() {
 				{ ...formData, datetime_added: new Date().toISOString(), settings: defaultSettings }
 			];
 		}
-	
+
 		setStreams(updatedStreams);
 		localStorage.setItem("streams", JSON.stringify(updatedStreams));
-	
+
 		// Réinitialiser le formulaire
 		setFormData({ name: "", domain: "", username: "", password: "" });
 		setIsOpen(false);
 		setEditIndex(null);
 	};
-	
 
 	const editStream = (index) => {
 		setFormData(streams[index]);

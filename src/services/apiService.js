@@ -1,5 +1,4 @@
 export const apiService = {
-
 	fetchStreamInfo: async (stream) => {
 		const url = `${stream.domain}/player_api.php?username=${stream.username}&password=${stream.password}`;
 		try {
@@ -111,28 +110,27 @@ export const apiService = {
 
 	// Fetch VOD info
 	fetchVodInfo: async (stream, vodId) => {
-        const url = `${stream.domain}/player_api.php?username=${stream.username}&password=${stream.password}&action=get_vod_info&vod_id=${vodId}`;
-        
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    'User-Agent': 'OpenIPTV/1.0',
-                    'Content-Type': 'application/json'
-                }
-            });
-			
+		const url = `${stream.domain}/player_api.php?username=${stream.username}&password=${stream.password}&action=get_vod_info&vod_id=${vodId}`;
 
-            if (response.ok) {
-                return await response.json();
-            } else {
-                console.error("Failed to fetch VOD info");
-                return null;
-            }
-        } catch (error) {
-            console.error("Connection error:", error);
-            return null;
-        }
-    },
+		try {
+			const response = await fetch(url, {
+				headers: {
+					"User-Agent": "OpenIPTV/1.0",
+					"Content-Type": "application/json"
+				}
+			});
+
+			if (response.ok) {
+				return await response.json();
+			} else {
+				console.error("Failed to fetch VOD info");
+				return null;
+			}
+		} catch (error) {
+			console.error("Connection error:", error);
+			return null;
+		}
+	},
 
 	// Fetch series categories
 	fetchSeriesCategories: async (stream) => {
@@ -198,5 +196,5 @@ export const apiService = {
 			console.error("Connection error:", error);
 			return null;
 		}
-	},
+	}
 };
