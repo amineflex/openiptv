@@ -1,0 +1,37 @@
+import type {
+	EmbeddedSubtitleExtractResult,
+	EmbeddedSubtitleListResult
+} from "./types";
+
+declare global {
+	interface Window {
+		openIptv?: {
+			listEmbeddedSubtitles: (streamUrl: string) => Promise<EmbeddedSubtitleListResult>;
+			extractEmbeddedSubtitle: (
+				streamUrl: string,
+				streamIndex: number
+			) => Promise<EmbeddedSubtitleExtractResult>;
+		};
+	}
+
+	// Audio Track API — experimental, absent from the standard TS DOM lib.
+	interface AudioTrack {
+		id: string;
+		kind: string;
+		label: string;
+		language: string;
+		enabled: boolean;
+	}
+
+	interface AudioTrackList {
+		readonly length: number;
+		[index: number]: AudioTrack;
+		getTrackById(id: string): AudioTrack | null;
+	}
+
+	interface HTMLVideoElement {
+		readonly audioTracks?: AudioTrackList;
+	}
+}
+
+export {};

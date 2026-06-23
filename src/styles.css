@@ -2,27 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
-/* scrollbar */
+/* ----------------------------------------------------------------------------
+   Base typography & feel
+---------------------------------------------------------------------------- */
+@layer base {
+	html {
+		scroll-behavior: smooth;
+	}
+
+	body {
+		font-family: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		text-rendering: optimizeLegibility;
+		background-color: #0b0a17;
+	}
+
+	h1,
+	h2,
+	h3 {
+		letter-spacing: -0.015em;
+	}
+
+	::selection {
+		background: rgba(145, 129, 255, 0.35);
+		color: #ffffff;
+	}
+
+	/* Keyboard focus ring — only shows for keyboard users, not on click. */
+	:focus-visible {
+		outline: 2px solid #9181ff;
+		outline-offset: 2px;
+		border-radius: 6px;
+	}
+
+	/* Smooth, consistent hover feedback across every link and button. */
+	a,
+	button {
+		transition: color 0.15s ease, background-color 0.15s ease,
+			border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+	}
+}
+
+/* ----------------------------------------------------------------------------
+   Scrollbars
+---------------------------------------------------------------------------- */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: #3a3c5e transparent;
+}
+
 *::-webkit-scrollbar {
 	height: 10px;
-	width: 6px;
+	width: 8px;
 }
+
 *::-webkit-scrollbar-track {
-	border-radius: 5px;
-	background-color: #131125;
-}
-
-*::-webkit-scrollbar-track:hover {
-	background-color: #0d0c1d;
-}
-
-*::-webkit-scrollbar-track:active {
-	background-color: #0d0c1d;
+	background: transparent;
 }
 
 *::-webkit-scrollbar-thumb {
-	border-radius: 5px;
-	background-color: #0d0c1d;
+	border-radius: 9999px;
+	background-color: #3a3c5e;
+	border: 2px solid transparent;
+	background-clip: padding-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
@@ -30,9 +73,117 @@
 }
 
 *::-webkit-scrollbar-thumb:active {
-	background-color: #474973;
+	background-color: #9181ff;
+}
+
+/* ----------------------------------------------------------------------------
+   Subtitles (WebVTT cues)
+---------------------------------------------------------------------------- */
+video::cue {
+	background: rgba(11, 10, 23, 0.72);
+	color: #f5f4ff;
+	font-size: 1.05em;
+	font-weight: 500;
+	line-height: 1.4;
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
 }
 
 .live_tv::-webkit-media-controls-timeline {
 	display: none;
+}
+
+/* ----------------------------------------------------------------------------
+   Player range inputs (progress / volume sliders)
+---------------------------------------------------------------------------- */
+.player-range {
+	-webkit-appearance: none;
+	appearance: none;
+	outline: none;
+	border: none;
+	background: transparent;
+}
+
+.player-range::-webkit-slider-runnable-track {
+	height: 6px;
+	border-radius: 9999px;
+	border: none;
+	background: transparent;
+}
+
+.player-range::-moz-range-track {
+	height: 6px;
+	border-radius: 9999px;
+	border: none;
+	background: transparent;
+}
+
+.player-range::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	margin-top: -5px;
+	border-radius: 50%;
+	background: #e3dfff;
+	cursor: pointer;
+	border: 2px solid #9181ff;
+	box-shadow: 0 0 6px rgba(145, 129, 255, 0.6);
+	transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.player-range::-moz-range-thumb {
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #e3dfff;
+	cursor: pointer;
+	border: 2px solid #9181ff;
+	box-shadow: 0 0 6px rgba(145, 129, 255, 0.6);
+}
+
+.player-range:focus {
+	outline: none;
+}
+
+.player-range:hover::-webkit-slider-thumb {
+	transform: scale(1.2);
+	box-shadow: 0 0 10px rgba(145, 129, 255, 0.8);
+}
+
+.player-range:focus::-webkit-slider-thumb {
+	box-shadow: 0 0 0 3px rgba(145, 129, 255, 0.3);
+}
+
+/* ----------------------------------------------------------------------------
+   Reusable polish helpers
+---------------------------------------------------------------------------- */
+@layer components {
+	/* Soft fade-in for page content. */
+	.fade-in {
+		animation: fade-in 0.35s ease both;
+	}
+}
+
+@keyframes fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		transition-duration: 0.001ms !important;
+	}
 }

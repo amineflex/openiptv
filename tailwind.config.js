@@ -1,8 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-	content: ["./*.{html,js}", "./src/**/*.{js,jsx}"],
+	content: ["./*.html", "./src/**/*.{ts,tsx}"],
 	theme: {
 		extend: {
+			fontFamily: {
+				sans: ["DM Sans", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"]
+			},
 			colors: {
 				secondary: {
 					DEFAULT: "#e3dfff",
