@@ -87,6 +87,8 @@ export function useVideoPlayer(
 	const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>("off");
 	const [subtitleLoadingId, setSubtitleLoadingId] = useState<string | null>(null);
 	const [subtitleError, setSubtitleError] = useState<string | null>(null);
+	const [playableStreamUrl, setPlayableStreamUrl] = useState<string | null>(null);
+	const [durationOverride, setDurationOverride] = useState<number | null>(null);
 	const [currentTime, setCurrentTime] = useState(0);
 	const [duration, setDuration] = useState(0);
 	const [isPaused, setIsPaused] = useState(true);
@@ -126,14 +128,64 @@ export function useVideoPlayer(
 		return [...external, ...embedded];
 	}, [embeddedSubtitleTracks, subtitleTracks]);
 
+	// Keep the player native, but swap AC3/E-AC3 VOD audio to a local AAC stream when needed.
+	useEffect(() => {
+		let cancelled = false;
+
+		if (!streamUrl) {
+			setPlayableStreamUrl(null);
+			setDurationOverride(null);
+			return;
+		}
+
+		if (type !== "vod" || !window.openIptv?.resolvePlayableStream) {
+			setPlayableStreamUrl(streamUrl);
+			setDurationOverride(null);
+			return;
+		}
+
+		setPlayableStreamUrl(null);
+		setDurationOverride(null);
+		setIsBuffering(true);
+
+		const resolvePlayableUrl = async () => {
+			try {
+				const result = await window.openIptv?.resolvePlayableStream(streamUrl);
+				if (cancelled) return;
+				setPlayableStreamUrl(result?.ok && result.url ? result.url : streamUrl);
+				setDurationOverride(
+					result?.durationSeconds && result.durationSeconds > 0 ? result.durationSeconds : null
+				);
+			} catch {
+				if (!cancelled) {
+					setPlayableStreamUrl(streamUrl);
+					setDurationOverride(null);
+				}
+			} finally {
+				if (!cancelled) setIsBuffering(false);
+			}
+		};
+
+		void resolvePlayableUrl();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [streamUrl, type]);
+
 	// Attach the video source and wire up playback events (VOD only).
 	useEffect(() => {
 		const video = videoRef.current;
-		if (!video || type !== "vod" || !streamUrl) return;
+		if (!video || type !== "vod" || !playableStreamUrl) return;
 
-		video.src = streamUrl;
+		video.src = playableStreamUrl;
 		video.volume = volume;
 		void video.play();
+
+		const getStableDuration = () => {
+			if (durationOverride && durationOverride > 0) return durationOverride;
+			return Number.isFinite(video.duration) ? video.duration : 0;
+		};
 
 		const syncAudioTracks = () => {
 			const tracks = video.audioTracks;
@@ -155,12 +207,12 @@ export function useVideoPlayer(
 		};
 
 		const handleLoadedMetadata = () => {
-			setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+			setDuration(getStableDuration());
 			syncAudioTracks();
 		};
 
 		const handleDurationChange = () => {
-			setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+			setDuration(getStableDuration());
 		};
 		const handleTimeUpdate = () => setCurrentTime(video.currentTime);
 		const handlePlay = () => setIsPaused(false);
@@ -192,7 +244,7 @@ export function useVideoPlayer(
 			video.removeAttribute("src");
 			video.load();
 		};
-	}, [streamUrl, type, videoRef]);
+	}, [durationOverride, playableStreamUrl, type, videoRef]);
 
 	// Fetch + convert external (Xtream) subtitles into same-origin blobs.
 	useEffect(() => {
@@ -345,9 +397,12 @@ export function useVideoPlayer(
 		const video = videoRef.current;
 		if (!video || !Number.isFinite(time)) return;
 
-		video.currentTime = Math.max(0, Math.min(time, video.duration || time));
+		const maxTime = durationOverride && durationOverride > 0
+			? durationOverride
+			: video.duration || time;
+		video.currentTime = Math.max(0, Math.min(time, maxTime));
 		setCurrentTime(video.currentTime);
-	}, [videoRef]);
+	}, [durationOverride, videoRef]);
 
 	const setVolume = useCallback((value: number) => {
 		const video = videoRef.current;

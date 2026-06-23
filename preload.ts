@@ -5,5 +5,8 @@ contextBridge.exposeInMainWorld("openIptv", {
 		ipcRenderer.invoke("subtitle:list-embedded", streamUrl),
 
 	extractEmbeddedSubtitle: (streamUrl: string, streamIndex: number) =>
-		ipcRenderer.invoke("subtitle:extract-embedded", streamUrl, streamIndex)
+		ipcRenderer.invoke("subtitle:extract-embedded", streamUrl, streamIndex),
+
+	resolvePlayableStream: (streamUrl: string) =>
+		ipcRenderer.invoke("media:resolve-playable-stream", streamUrl)
 });

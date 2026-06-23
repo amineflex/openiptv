@@ -156,6 +156,15 @@ export interface EmbeddedSubtitleExtractResult {
 	error?: string;
 }
 
+export interface PlayableStreamResult {
+	ok: boolean;
+	url: string;
+	transcoded: boolean;
+	audioCodecs: string[];
+	durationSeconds?: number;
+	error?: string;
+}
+
 export type FavouriteType = "movie" | "series";
 
 export interface FavouriteItem {
