@@ -12,8 +12,8 @@ export default function FavouriteButton({ item }: FavouriteButtonProps) {
 	const [isFavourite, setIsFavourite] = useState(false);
 
 	useEffect(() => {
-		setIsFavourite(favouritesService.isFavourite(item.type, item.id));
-	}, [item.id, item.type]);
+		setIsFavourite(favouritesService.isFavourite(item.streamId, item.type, item.id));
+	}, [item.id, item.streamId, item.type]);
 
 	const toggleFavourite = () => {
 		setIsFavourite(favouritesService.toggle(item));

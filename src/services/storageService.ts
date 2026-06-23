@@ -30,6 +30,10 @@ function readJson<T>(key: string, fallback: T): T {
 	}
 }
 
+function scopedKey(streamId: string, key: string): string {
+	return `stream:${streamId}:${key}`;
+}
+
 function normalizeSettings(settings?: Partial<StreamSettings>): StreamSettings {
 	return {
 		...DEFAULT_SETTINGS,
@@ -116,16 +120,20 @@ export const storageService = {
 		const filtered = streams.filter((s) => s.id !== id);
 		if (filtered.length === streams.length) return false;
 		localStorage.setItem(STORAGE_KEYS.STREAMS, JSON.stringify(filtered));
+		localStorage.removeItem(scopedKey(id, STORAGE_KEYS.SELECTED_CATEGORY));
+		localStorage.removeItem(scopedKey(id, STORAGE_KEYS.SELECTED_VOD_CATEGORY));
+		localStorage.removeItem(scopedKey(id, STORAGE_KEYS.SELECTED_SERIE_CATEGORY));
+		localStorage.removeItem(`favourites:${id}`);
 		return true;
 	},
 
-	getSelectedCategory(type: SelectedCategoryKey): Category | null {
-		const key = STORAGE_KEYS[type];
+	getSelectedCategory(streamId: string, type: SelectedCategoryKey): Category | null {
+		const key = scopedKey(streamId, STORAGE_KEYS[type]);
 		return readJson<Category | null>(key, null);
 	},
 
-	setSelectedCategory(type: SelectedCategoryKey, category: Category): void {
-		const key = STORAGE_KEYS[type];
+	setSelectedCategory(streamId: string, type: SelectedCategoryKey, category: Category): void {
+		const key = scopedKey(streamId, STORAGE_KEYS[type]);
 		localStorage.setItem(key, JSON.stringify(category));
 	}
 };

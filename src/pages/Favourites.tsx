@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
 	ArrowLeftIcon,
@@ -30,8 +30,13 @@ function sortByRecent(items: FavouriteItem[]): FavouriteItem[] {
 export default function Favourites() {
 	const { id } = useParams();
 	const stream = useStreamLoader(id);
-	const [favourites, setFavourites] = useState<FavouriteItem[]>(() => sortByRecent(favouritesService.getAll()));
+	const [favourites, setFavourites] = useState<FavouriteItem[]>([]);
 	const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+
+	useEffect(() => {
+		if (!stream) return;
+		setFavourites(sortByRecent(favouritesService.getAll(stream.id)));
+	}, [stream]);
 
 	const counts = useMemo(
 		() => ({
@@ -50,7 +55,9 @@ export default function Favourites() {
 	const removeFavourite = (item: FavouriteItem) => {
 		favouritesService.toggle(item);
 		setFavourites((current) =>
-			current.filter((favourite) => !(favourite.type === item.type && favourite.id === item.id))
+			current.filter((favourite) =>
+				!(favourite.streamId === item.streamId && favourite.type === item.type && favourite.id === item.id)
+			)
 		);
 	};
 
@@ -121,7 +128,7 @@ export default function Favourites() {
 				) : (
 					<div className="flex flex-wrap gap-4 py-8">
 						{visibleFavourites.map((item) => (
-							<div key={`${item.type}:${item.id}`} className="group relative">
+							<div key={`${item.streamId}:${item.type}:${item.id}`} className="group relative">
 								<Link
 									to={item.route}
 									style={{

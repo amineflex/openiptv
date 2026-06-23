@@ -43,9 +43,10 @@ export default function Movies() {
 	} = useSearch({ items: visibleVods, fields: vodSearchFields });
 
 	useEffect(() => {
-		const saved = storageService.getSelectedCategory("SELECTED_VOD_CATEGORY");
+		if (!stream) return;
+		const saved = storageService.getSelectedCategory(stream.id, "SELECTED_VOD_CATEGORY");
 		setSelectedVodCategory(saved && (!adultContentEnabled || !isAdultCategory(saved)) ? saved : null);
-	}, [stream?.id, adultContentEnabled]);
+	}, [stream, adultContentEnabled]);
 
 	useEffect(() => {
 		setPage(0);
@@ -73,9 +74,10 @@ export default function Movies() {
 	}, [selectedVodCategory, stream]);
 
 	const handleCategorySelect = (category: Category) => {
+		if (!stream) return;
 		if (!adultContentEnabled && isAdultCategory(category)) return;
 		setSelectedVodCategory(category);
-		storageService.setSelectedCategory("SELECTED_VOD_CATEGORY", category);
+		storageService.setSelectedCategory(stream.id, "SELECTED_VOD_CATEGORY", category);
 	};
 
 	if (!stream) {

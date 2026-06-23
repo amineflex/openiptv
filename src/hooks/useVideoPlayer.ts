@@ -74,6 +74,12 @@ async function prepareSubtitleTrack(
 	}
 }
 
+function buildSeekableTranscodeUrl(url: string, startTime: number): string {
+	const nextUrl = new URL(url);
+	nextUrl.searchParams.set("start", Math.max(0, startTime).toFixed(3));
+	return nextUrl.toString();
+}
+
 export function useVideoPlayer(
 	videoRef: RefObject<HTMLVideoElement | null>,
 	streamUrl: string | null,
@@ -88,7 +94,10 @@ export function useVideoPlayer(
 	const [subtitleLoadingId, setSubtitleLoadingId] = useState<string | null>(null);
 	const [subtitleError, setSubtitleError] = useState<string | null>(null);
 	const [playableStreamUrl, setPlayableStreamUrl] = useState<string | null>(null);
+	const [resolvedStreamUrl, setResolvedStreamUrl] = useState<string | null>(null);
 	const [durationOverride, setDurationOverride] = useState<number | null>(null);
+	const [isTranscodedStream, setIsTranscodedStream] = useState(false);
+	const [streamOffset, setStreamOffset] = useState(0);
 	const [currentTime, setCurrentTime] = useState(0);
 	const [duration, setDuration] = useState(0);
 	const [isPaused, setIsPaused] = useState(true);
@@ -134,32 +143,50 @@ export function useVideoPlayer(
 
 		if (!streamUrl) {
 			setPlayableStreamUrl(null);
+			setResolvedStreamUrl(null);
 			setDurationOverride(null);
+			setIsTranscodedStream(false);
+			setStreamOffset(0);
+			setCurrentTime(0);
 			return;
 		}
 
 		if (type !== "vod" || !window.openIptv?.resolvePlayableStream) {
 			setPlayableStreamUrl(streamUrl);
+			setResolvedStreamUrl(streamUrl);
 			setDurationOverride(null);
+			setIsTranscodedStream(false);
+			setStreamOffset(0);
+			setCurrentTime(0);
 			return;
 		}
 
 		setPlayableStreamUrl(null);
+		setResolvedStreamUrl(null);
 		setDurationOverride(null);
+		setIsTranscodedStream(false);
+		setStreamOffset(0);
+		setCurrentTime(0);
 		setIsBuffering(true);
 
 		const resolvePlayableUrl = async () => {
 			try {
 				const result = await window.openIptv?.resolvePlayableStream(streamUrl);
 				if (cancelled) return;
-				setPlayableStreamUrl(result?.ok && result.url ? result.url : streamUrl);
+				const nextUrl = result?.ok && result.url ? result.url : streamUrl;
+				const shouldUseTranscodeSeek = Boolean(result?.ok && result.transcoded);
+				setResolvedStreamUrl(nextUrl);
+				setIsTranscodedStream(shouldUseTranscodeSeek);
+				setPlayableStreamUrl(shouldUseTranscodeSeek ? buildSeekableTranscodeUrl(nextUrl, 0) : nextUrl);
 				setDurationOverride(
 					result?.durationSeconds && result.durationSeconds > 0 ? result.durationSeconds : null
 				);
 			} catch {
 				if (!cancelled) {
 					setPlayableStreamUrl(streamUrl);
+					setResolvedStreamUrl(streamUrl);
 					setDurationOverride(null);
+					setIsTranscodedStream(false);
 				}
 			} finally {
 				if (!cancelled) setIsBuffering(false);
@@ -214,7 +241,11 @@ export function useVideoPlayer(
 		const handleDurationChange = () => {
 			setDuration(getStableDuration());
 		};
-		const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+		const handleTimeUpdate = () => {
+			const stableDuration = getStableDuration();
+			const nextTime = streamOffset + video.currentTime;
+			setCurrentTime(stableDuration > 0 ? Math.min(nextTime, stableDuration) : nextTime);
+		};
 		const handlePlay = () => setIsPaused(false);
 		const handlePause = () => setIsPaused(true);
 		const handleWaiting = () => setIsBuffering(true);
@@ -244,7 +275,7 @@ export function useVideoPlayer(
 			video.removeAttribute("src");
 			video.load();
 		};
-	}, [durationOverride, playableStreamUrl, type, videoRef]);
+	}, [durationOverride, playableStreamUrl, streamOffset, type, videoRef]);
 
 	// Fetch + convert external (Xtream) subtitles into same-origin blobs.
 	useEffect(() => {
@@ -400,9 +431,19 @@ export function useVideoPlayer(
 		const maxTime = durationOverride && durationOverride > 0
 			? durationOverride
 			: video.duration || time;
-		video.currentTime = Math.max(0, Math.min(time, maxTime));
+		const nextTime = Math.max(0, Math.min(time, maxTime));
+
+		if (isTranscodedStream && resolvedStreamUrl) {
+			setStreamOffset(nextTime);
+			setCurrentTime(nextTime);
+			setIsBuffering(true);
+			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, nextTime));
+			return;
+		}
+
+		video.currentTime = nextTime;
 		setCurrentTime(video.currentTime);
-	}, [durationOverride, videoRef]);
+	}, [durationOverride, isTranscodedStream, resolvedStreamUrl, videoRef]);
 
 	const setVolume = useCallback((value: number) => {
 		const video = videoRef.current;
@@ -441,6 +482,24 @@ export function useVideoPlayer(
 		setSelectedAudioIndex(index);
 		setAudioTracks(Array.from(tracks));
 	}, [videoRef]);
+
+	useEffect(() => {
+		if (type !== "vod") return;
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+			if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+
+			event.preventDefault();
+			const step = event.key === "ArrowLeft" ? -10 : 10;
+			const maxTime = duration > 0 ? duration : Number.POSITIVE_INFINITY;
+			const nextTime = Math.max(0, Math.min(currentTime + step, maxTime));
+			seekTo(nextTime);
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [currentTime, duration, seekTo, type]);
 
 	return {
 		audioTracks,

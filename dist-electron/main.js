@@ -118,6 +118,7 @@ function ensureTranscodeServer() {
         const server = http_1.default.createServer((request, response) => {
             const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
             const match = requestUrl.pathname.match(/^\/transcode\/([^/]+)$/);
+            const startTime = Math.max(0, Number(requestUrl.searchParams.get("start") ?? 0) || 0);
             if (!match) {
                 response.writeHead(404);
                 response.end();
@@ -134,20 +135,31 @@ function ensureTranscodeServer() {
                 "Cache-Control": "no-store",
                 "Content-Type": "video/mp4"
             });
-            const proc = (0, child_process_1.spawn)("ffmpeg", [
+            const args = [
                 "-hide_banner",
                 "-loglevel", "error",
+                "-fflags", "+genpts",
+                ...(startTime > 0 ? ["-ss", startTime.toFixed(3)] : []),
                 "-i", sourceUrl,
                 "-map", "0:v:0?",
                 "-map", "0:a:0?",
-                "-c:v", "copy",
+                "-vf", "setpts=PTS-STARTPTS",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-crf", "23",
+                "-pix_fmt", "yuv420p",
+                "-af", "aresample=async=1:first_pts=0",
                 "-c:a", "aac",
                 "-ac", "2",
                 "-b:a", "192k",
+                "-avoid_negative_ts", "make_zero",
+                "-muxdelay", "0",
+                "-muxpreload", "0",
                 "-movflags", "frag_keyframe+empty_moov+default_base_moof",
                 "-f", "mp4",
                 "pipe:1"
-            ]);
+            ];
+            const proc = (0, child_process_1.spawn)("ffmpeg", args);
             proc.stdout.pipe(response);
             request.on("close", () => {
                 if (!proc.killed)

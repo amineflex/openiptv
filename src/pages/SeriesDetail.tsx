@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CalendarDaysIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
 import FavouriteButton from "../components/FavouriteButton";
 import LoadingSpinner from "../components/LoadingSpinner";
 import NotFound from "../components/NotFound";
+import StarRating from "../components/StarRating";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
+import { formatReleaseDate, getReleaseYear } from "../services/dateService";
 import { generateStreamUrl } from "../services/streamService";
 import { extractSubtitleTracks } from "../services/subtitleService";
 import { buildWatchRoute } from "../services/watchRoute";
-import  StarRating  from "../components/StarRating";
 import type { SeriesEpisode, SeriesInfo, SubtitleTrack, WatchNextEpisode } from "../types";
 
 const placeholderPoster = "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png";
@@ -36,6 +37,7 @@ export default function SeriesDetail() {
 	const stream = useStreamLoader(id);
 	const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [selectedSeason, setSelectedSeason] = useState("");
 
 	useEffect(() => {
 		if (!stream || !seriesId) return;
@@ -62,6 +64,17 @@ export default function SeriesDetail() {
 		return entries.sort(([a], [b]) => Number(a) - Number(b));
 	}, [seriesInfo]);
 
+	useEffect(() => {
+		if (seasons.length === 0) {
+			setSelectedSeason("");
+			return;
+		}
+
+		setSelectedSeason((current) =>
+			seasons.some(([season]) => season === current) ? current : seasons[0][0]
+		);
+	}, [seasons]);
+
 	if (!stream) {
 		return <NotFound message="Stream not found" />;
 	}
@@ -83,8 +96,12 @@ export default function SeriesDetail() {
 	}
 
 	const title = seriesInfo.info.name || "Series";
+	const releaseValue = seriesInfo.info.releaseDate || seriesInfo.info.releasedate;
+	const releaseDate = formatReleaseDate(releaseValue);
+	const releaseYear = getReleaseYear(releaseValue);
 	const favouriteItem = {
 		id: seriesId,
+		streamId: stream.id,
 		type: "series" as const,
 		title,
 		image: seriesInfo.info.cover,
@@ -93,6 +110,11 @@ export default function SeriesDetail() {
 	};
 	const orderedEpisodes = seasons.flatMap(([, episodes]) =>
 		[...episodes].sort((a, b) => Number(a.episode_num ?? 0) - Number(b.episode_num ?? 0))
+	);
+	const activeSeasonEntry = seasons.find(([season]) => season === selectedSeason) ?? seasons[0];
+	const activeSeason = activeSeasonEntry?.[0] ?? "";
+	const activeEpisodes = [...(activeSeasonEntry?.[1] ?? [])].sort(
+		(a, b) => Number(a.episode_num ?? 0) - Number(b.episode_num ?? 0)
 	);
 	const watchItems = orderedEpisodes.map((episode) => {
 		const streamUrl = generateStreamUrl(
@@ -138,78 +160,157 @@ export default function SeriesDetail() {
 	}, {});
 
 	return (
-		<div className="bg-dark text-secondary min-h-screen">
-			<div className="container mx-auto px-4 py-8">
-				<header className="flex flex-row items-start gap-6 mb-8">
+		<div className="relative min-h-screen bg-dark text-secondary">
+			<div className="absolute inset-x-0 top-0 h-[420px] overflow-hidden">
+				<img
+					src={seriesInfo.info.cover || placeholderPoster}
+					alt=""
+					className="h-full w-full scale-110 object-cover object-top opacity-35 blur-sm"
+				/>
+				<div className="absolute inset-0 bg-gradient-to-t from-dark via-dark/85 to-dark/40" />
+				<div className="absolute inset-0 bg-gradient-to-r from-dark via-dark/70 to-transparent" />
+			</div>
+
+			<div className="relative z-10 px-6 py-5">
+				<Link
+					to={`/menu/${id}/series`}
+					className="inline-flex rounded-full bg-dark/55 p-2.5 text-secondary-400 backdrop-blur transition hover:bg-secondary-400 hover:text-dark"
+					aria-label="Back to series"
+				>
+					<ArrowLeftIcon className="h-5 w-5" />
+				</Link>
+			</div>
+
+			<main className="fade-in relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-12">
+				<header className="flex flex-col gap-8 md:flex-row md:items-end">
 					<img
 						src={seriesInfo.info.cover || placeholderPoster}
 						alt={title}
-						className="w-48 rounded-lg shadow-lg"
+						className="w-56 flex-none self-center rounded-2xl border border-white/10 object-cover shadow-2xl shadow-black/60 md:self-auto"
 					/>
+
 					<div className="flex-1">
-						<Link
-							to={`/menu/${id}/series`}
-							className="inline-flex text-secondary/75 text-sm font-semibold items-center rounded-full bg-primary/10 hover:bg-primary-100 p-2 mb-4"
-						>
-							<ArrowLeftIcon className="h-5 w-5 text-secondary-400" />
-						</Link>
-						<div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-							<h1 className="text-4xl font-bold text-white">{title}</h1>
+						<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+							<div>
+								<div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+									<span className="rounded-full bg-secondary-400/15 px-3 py-1 font-bold text-secondary-400">Series</span>
+									{releaseYear && (
+										<span className="rounded-full bg-white/10 px-3 py-1 font-semibold text-secondary-800">{releaseYear}</span>
+									)}
+								</div>
+								<h1 className="text-4xl font-bold leading-tight text-white md:text-5xl">{title}</h1>
+							</div>
 							<FavouriteButton item={favouriteItem} />
 						</div>
-						<p className="text-lg text-secondary-800 mb-4">{seriesInfo.info.plot}</p>
-						<div className="flex flex-wrap gap-2 text-sm">
-							{seriesInfo.info.genre && (
-								<span className="bg-secondary-400/25 text-secondary-400 py-1 px-2 rounded-xl">
-									{seriesInfo.info.genre}
+
+						<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+							<StarRating value={seriesInfo.info.rating} scale={10} size="md" showValue />
+							{releaseDate && (
+								<span className="inline-flex items-center gap-1.5 text-secondary-700">
+									<CalendarDaysIcon className="h-4 w-4 text-secondary-400" />
+									Released {releaseDate}
 								</span>
 							)}
-							{seriesInfo.info.rating && (
-								<StarRating value={seriesInfo.info.rating} scale={10} />
-							)}
-							{(seriesInfo.info.releaseDate || seriesInfo.info.releasedate) && (
-								<span>Release: {seriesInfo.info.releaseDate || seriesInfo.info.releasedate}</span>
-							)}
+							<span className="inline-flex items-center gap-1.5 text-secondary-700">
+								<QueueListIcon className="h-4 w-4 text-secondary-400" />
+								{seasons.length} season{seasons.length !== 1 ? "s" : ""} - {orderedEpisodes.length} episode{orderedEpisodes.length !== 1 ? "s" : ""}
+							</span>
 						</div>
-					</div>
-				</header>
 
-				<div className="space-y-8">
-					{seasons.map(([season, episodes]) => (
-						<section key={season}>
-							<h2 className="text-2xl font-bold mb-4">Season {season}</h2>
-							<div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-								{episodes.map((episode) => {
-									const watchItem = watchItemByEpisodeId[String(episode.id)];
-									if (!watchItem) return null;
+						{seriesInfo.info.genre && (
+							<div className="mt-4 flex flex-wrap gap-2">
+								{seriesInfo.info.genre.split(",").map((genre) => {
+									const label = genre.trim();
+									if (!label) return null;
 
 									return (
-										<Link
-											key={episode.id}
-											to={watchItem.route}
-											state={{
-												subtitles: watchItem.subtitles,
-												nextEpisode: nextByEpisodeId[String(episode.id)]
-											}}
-											className="flex gap-4 bg-primary/10 hover:bg-primary/20 rounded-xl p-4 border-2 border-transparent hover:border-secondary-400 duration-150"
-										>
-											<img
-												src={episode.info?.movie_image || seriesInfo.info?.cover || placeholderPoster}
-												alt={getEpisodeTitle(episode)}
-												className="w-28 h-16 object-cover rounded-lg bg-black"
-											/>
-											<div>
-												<h3 className="text-lg font-semibold text-white">{getEpisodeTitle(episode)}</h3>
-												<p className="text-sm text-secondary-800 line-clamp-2">{episode.info?.plot}</p>
-											</div>
-										</Link>
+										<span key={label} className="rounded-full bg-secondary-400/15 px-3 py-1 text-xs font-semibold text-secondary-400">
+											{label}
+										</span>
 									);
 								})}
 							</div>
-						</section>
-					))}
-				</div>
-			</div>
+						)}
+
+						{seriesInfo.info.plot && (
+							<p className="mt-7 max-w-3xl leading-relaxed text-secondary-800">{seriesInfo.info.plot}</p>
+						)}
+					</div>
+				</header>
+
+				<section className="mt-12">
+					<div className="mb-5 flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
+						<div>
+							<h2 className="text-2xl font-bold text-white">Episodes</h2>
+							<p className="mt-1 text-sm text-secondary-700">
+								Season {activeSeason || "-"} - {activeEpisodes.length} episode{activeEpisodes.length !== 1 ? "s" : ""}
+							</p>
+						</div>
+
+						<label className="flex w-full flex-col gap-2 md:w-64">
+							<span className="text-xs font-bold uppercase tracking-wide text-secondary-700">Season</span>
+							<select
+								value={activeSeason}
+								onChange={(event) => setSelectedSeason(event.target.value)}
+								className="rounded-xl border border-white/10 bg-primary/20 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-black/20 outline-none transition hover:border-secondary-400/50 focus:border-secondary-400"
+							>
+								{seasons.map(([season, episodes]) => (
+									<option key={season} value={season} className="bg-dark text-white">
+										Season {season} - {episodes.length} episodes
+									</option>
+								))}
+							</select>
+						</label>
+					</div>
+
+					<div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+						{activeEpisodes.map((episode) => {
+							const watchItem = watchItemByEpisodeId[String(episode.id)];
+							if (!watchItem) return null;
+
+							const episodeDate = formatReleaseDate(episode.info?.releasedate);
+
+							return (
+								<Link
+									key={episode.id}
+									to={watchItem.route}
+									state={{
+										subtitles: watchItem.subtitles,
+										nextEpisode: nextByEpisodeId[String(episode.id)]
+									}}
+									className="group flex min-h-[132px] gap-4 rounded-xl border border-white/10 bg-primary/10 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-xl hover:shadow-secondary-400/10"
+								>
+									<div className="relative h-28 w-40 flex-none overflow-hidden rounded-lg bg-black">
+										<img
+											src={episode.info?.movie_image || seriesInfo.info?.cover || placeholderPoster}
+											alt={getEpisodeTitle(episode)}
+											loading="lazy"
+											className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+										/>
+										<div className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition group-hover:opacity-100">
+											<PlayCircleIcon className="h-11 w-11 text-secondary-400" />
+										</div>
+									</div>
+
+									<div className="min-w-0 flex-1 py-1">
+										<div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-700">
+											<span className="rounded-full bg-secondary-400/15 px-2 py-0.5 font-bold text-secondary-400">
+												Episode {episode.episode_num || "-"}
+											</span>
+											{episodeDate && <span>{episodeDate}</span>}
+											{episode.info?.duration && <span>{episode.info.duration}</span>}
+										</div>
+										<h3 className="line-clamp-2 text-lg font-bold text-white">{episode.title || getEpisodeTitle(episode)}</h3>
+										{episode.info?.plot && (
+											<p className="mt-2 line-clamp-2 text-sm leading-relaxed text-secondary-800">{episode.info.plot}</p>
+										)}
+									</div>
+								</Link>
+							);
+						})}
+					</div>
+				</section>
+			</main>
 		</div>
 	);
 }

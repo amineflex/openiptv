@@ -43,9 +43,10 @@ export default function Series() {
 	} = useSearch({ items: visibleSeries, fields: seriesSearchFields });
 
 	useEffect(() => {
-		const saved = storageService.getSelectedCategory("SELECTED_SERIE_CATEGORY");
+		if (!stream) return;
+		const saved = storageService.getSelectedCategory(stream.id, "SELECTED_SERIE_CATEGORY");
 		setSelectedSerieCategory(saved && (!adultContentEnabled || !isAdultCategory(saved)) ? saved : null);
-	}, [stream?.id, adultContentEnabled]);
+	}, [stream, adultContentEnabled]);
 
 	useEffect(() => {
 		setPage(0);
@@ -73,9 +74,10 @@ export default function Series() {
 	}, [selectedSerieCategory, stream]);
 
 	const handleCategorySelect = (category: Category) => {
+		if (!stream) return;
 		if (!adultContentEnabled && isAdultCategory(category)) return;
 		setSelectedSerieCategory(category);
-		storageService.setSelectedCategory("SELECTED_SERIE_CATEGORY", category);
+		storageService.setSelectedCategory(stream.id, "SELECTED_SERIE_CATEGORY", category);
 	};
 
 	if (!stream) {

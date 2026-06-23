@@ -7,6 +7,7 @@ import NotFound from "../components/NotFound";
 import StarRating from "../components/StarRating";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
+import { formatReleaseDate, getReleaseYear } from "../services/dateService";
 import { generateStreamUrl } from "../services/streamService";
 import { extractSubtitleTracks } from "../services/subtitleService";
 import { buildWatchRoute } from "../services/watchRoute";
@@ -68,6 +69,8 @@ export default function Movie() {
 	const backdrop = movieInfo.info.backdrop_path;
 	const backdropUrl = Array.isArray(backdrop) ? backdrop[0] ?? "" : backdrop ?? "";
 	const movieName = movieInfo.info.name || "Movie";
+	const releaseDate = formatReleaseDate(movieInfo.info.releasedate);
+	const releaseYear = getReleaseYear(movieInfo.info.releasedate);
 	const subtitles = extractSubtitleTracks(
 		[
 			movieInfo.subtitles,
@@ -96,6 +99,7 @@ export default function Movie() {
 	});
 	const favouriteItem = {
 		id: movieId,
+		streamId: stream.id,
 		type: "movie" as const,
 		title: movieName,
 		image: movieInfo.info.movie_image || movieInfo.info.cover_big,
@@ -136,8 +140,11 @@ export default function Movie() {
 
 						<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
 							<StarRating value={movieInfo.info.rating} scale={10} size="md" showValue />
-							{movieInfo.info.releasedate && (
-								<span className="text-secondary-700">{movieInfo.info.releasedate}</span>
+							{releaseYear && (
+								<span className="rounded-full bg-white/10 px-3 py-1 font-semibold text-secondary-800">{releaseYear}</span>
+							)}
+							{releaseDate && (
+								<span className="text-secondary-700">Released {releaseDate}</span>
 							)}
 						</div>
 

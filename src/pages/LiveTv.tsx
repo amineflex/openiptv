@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { PlayCircleIcon, TvIcon } from "@heroicons/react/24/outline";
 import CategoryList from "../components/CategoryList";
 import LoadingSpinner from "../components/LoadingSpinner";
 import NotFound from "../components/NotFound";
@@ -13,6 +14,12 @@ import { generateStreamUrl } from "../services/streamService";
 import { storageService } from "../services/storageService";
 import { buildWatchRoute } from "../services/watchRoute";
 import type { Category, LiveChannel } from "../types";
+
+function getChannelInitials(name: string): string {
+	const words = name.trim().split(/\s+/).filter(Boolean);
+	if (words.length === 0) return "TV";
+	return words.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+}
 
 export default function LiveTv() {
 	const { id } = useParams();
@@ -49,9 +56,10 @@ export default function LiveTv() {
 	} = useSearch({ items: visibleChannels, fields: channelSearchFields });
 
 	useEffect(() => {
-		const saved = storageService.getSelectedCategory("SELECTED_CATEGORY");
+		if (!stream) return;
+		const saved = storageService.getSelectedCategory(stream.id, "SELECTED_CATEGORY");
 		setSelectedCategory(saved && (!adultContentEnabled || !isAdultCategory(saved)) ? saved : null);
-	}, [stream?.id, adultContentEnabled]);
+	}, [stream, adultContentEnabled]);
 
 	useEffect(() => {
 		setVisibleCount(limit);
@@ -105,9 +113,10 @@ export default function LiveTv() {
 	}, [searchedChannels, selectedCategory, stream, visibleCount]);
 
 	const handleCategorySelect = (category: Category) => {
+		if (!stream) return;
 		if (!adultContentEnabled && isAdultCategory(category)) return;
 		setSelectedCategory(category);
-		storageService.setSelectedCategory("SELECTED_CATEGORY", category);
+		storageService.setSelectedCategory(stream.id, "SELECTED_CATEGORY", category);
 	};
 
 	if (!stream) {
@@ -145,24 +154,43 @@ export default function LiveTv() {
 							</div>
 						) : (
 							<div>
-								<div className="grid md:grid-cols-3 grid-cols-1 gap-4">
+								<div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
 									{channelLinks.map(({ channel, to }) => (
 										<Link
 											key={channel.stream_id}
 											to={to}
-											className="group p-4 bg-primary/10 rounded-xl text-center text-xl flex flex-col items-center text-secondary border-2 border-transparent hover:border-secondary-400 hover:bg-primary/20 duration-150"
+											className="group flex min-h-[112px] items-center gap-4 rounded-xl border border-white/10 bg-primary/10 p-4 text-left text-secondary shadow-lg shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-secondary-400/10"
 										>
-											<img
-												src={channel.stream_icon || "https://picsum.photos/200/300"}
-												alt={channel.name}
-												className="rounded-xl mb-4"
-												style={{ maxWidth: "80px", maxHeight: "80px", objectFit: "cover" }}
-											/>
-											<h3 className="text-lg font-semibold">
-												<span className="text-dark bg-secondary-400 rounded-full px-2 mr-2">{channel.num}</span>
-												<span>{channel.name}</span>
-											</h3>
-											<p className="text-sm">{selectedCategory.category_name}</p>
+											<div className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-dark/70">
+												{channel.stream_icon ? (
+													<img
+														src={channel.stream_icon}
+														alt={channel.name}
+														loading="lazy"
+														className="h-full w-full object-contain p-2"
+														onError={(event) => {
+															event.currentTarget.style.display = "none";
+														}}
+													/>
+												) : (
+													<span className="text-sm font-black text-secondary-400">{getChannelInitials(channel.name)}</span>
+												)}
+											</div>
+
+											<div className="min-w-0 flex-1">
+												<div className="mb-1 flex items-center gap-2 text-xs">
+													<span className="rounded-full bg-secondary-400 px-2 py-0.5 font-black text-dark">
+														{channel.num || channel.stream_id}
+													</span>
+													<span className="inline-flex min-w-0 items-center gap-1 text-secondary-700">
+														<TvIcon className="h-3.5 w-3.5 flex-none text-secondary-400" />
+														<span className="truncate">{selectedCategory.category_name}</span>
+													</span>
+												</div>
+												<h3 className="line-clamp-2 text-base font-bold leading-snug text-white">{channel.name}</h3>
+											</div>
+
+											<PlayCircleIcon className="h-8 w-8 flex-none text-secondary-700 transition group-hover:text-secondary-400" />
 										</Link>
 									))}
 								</div>

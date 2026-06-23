@@ -169,6 +169,7 @@ export type FavouriteType = "movie" | "series";
 
 export interface FavouriteItem {
 	id: string;
+	streamId: string;
 	type: FavouriteType;
 	title: string;
 	image?: string;
