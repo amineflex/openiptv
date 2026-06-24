@@ -2,4 +2,8 @@ node_modules
 dist
 bun.lockb
 out
+.electron-cache
+dist-electron
+dist
+.agents
 .npm-cache
