@@ -27,10 +27,13 @@ export interface IptvStream {
 
 export interface StreamInfo {
 	user_info?: {
+		username?: string;
 		exp_date?: string | number | null;
 		status?: string;
 		active_cons?: string | number;
 		max_connections?: string | number;
+		is_trial?: string | number;
+		created_at?: string | number | null;
 	};
 	server_info?: Record<string, unknown>;
 }

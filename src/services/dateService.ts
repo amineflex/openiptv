@@ -26,3 +26,17 @@ export function getReleaseYear(value?: string | number | null): string | null {
 	const formatted = formatReleaseDate(value);
 	return formatted?.match(/\b\d{4}\b/)?.[0] ?? null;
 }
+
+export function formatXtreamDate(value?: string | number | null): string {
+	if (!value) return "Unknown";
+
+	const raw = String(value).trim();
+	if (!raw) return "Unknown";
+
+	const numeric = Number(raw);
+	const date = Number.isFinite(numeric)
+		? new Date(numeric * 1000)
+		: new Date(raw);
+
+	return Number.isNaN(date.getTime()) ? "Unknown" : dateFormatter.format(date);
+}

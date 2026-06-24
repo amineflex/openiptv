@@ -10,6 +10,7 @@ import Movie from "./pages/Movie";
 import Watch from "./pages/Watch";
 import Settings from "./pages/Settings";
 import Favourites from "./pages/Favourites";
+import AccountInfo from "./pages/AccountInfo";
 
 export default function App() {
 	return (
@@ -17,6 +18,7 @@ export default function App() {
 			<Routes>
 				<Route path="/" element={<Home />} />
 				<Route path="/menu/:id" element={<Menu />} />
+				<Route path="/menu/:id/account" element={<AccountInfo />} />
 				<Route path="/menu/:id/favourites" element={<Favourites />} />
 				<Route path="/menu/:id/settings" element={<Settings />} />
 				<Route path="/menu/:id/tv" element={<LiveTv />} />

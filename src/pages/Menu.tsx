@@ -25,7 +25,7 @@ interface MenuItem {
 }
 
 function formatTime(hourFormat: "12H" | "24H"): string {
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat(("en-US"), {
 		hour: "2-digit",
 		minute: "2-digit",
 		hour12: hourFormat === "12H"
@@ -33,7 +33,7 @@ function formatTime(hourFormat: "12H" | "24H"): string {
 }
 
 function formatDate(): string {
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat(("en-US"), {
 		weekday: "long",
 		day: "numeric",
 		month: "long"
@@ -50,7 +50,7 @@ function formatExpirationDate(value?: string | number | null): string {
 
 	if (Number.isNaN(date.getTime())) return "Unknown";
 
-	return new Intl.DateTimeFormat(undefined, {
+	return new Intl.DateTimeFormat(("en-US"), {
 		year: "numeric",
 		month: "short",
 		day: "2-digit"
@@ -182,25 +182,31 @@ export default function Menu() {
 					</section>
 
 					<aside className="flex flex-col gap-4">
-						<div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur">
+						<Link
+							to="account"
+							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400"
+						>
 							<div className="flex items-center gap-3">
-								<UserCircleIcon className="h-9 w-9 text-secondary-400" />
+								<UserCircleIcon className="h-9 w-9 text-secondary-400 transition group-hover:text-secondary" />
 								<div className="min-w-0">
 									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Connected as</p>
 									<p className="truncate text-lg font-bold text-white">{stream.username}</p>
 								</div>
 							</div>
-						</div>
+						</Link>
 
-						<div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur">
+						<Link
+							to="account"
+							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400"
+						>
 							<div className="flex items-center gap-3">
-								<CalendarDaysIcon className="h-8 w-8 text-secondary-400" />
+								<CalendarDaysIcon className="h-8 w-8 text-secondary-400 transition group-hover:text-secondary" />
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Subscription ends</p>
 									<p className="text-lg font-bold text-white">{expirationDate}</p>
 								</div>
 							</div>
-						</div>
+						</Link>
 
 						<Link
 							to="favourites"

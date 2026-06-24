@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import Player from "../components/Player";
 import LivePlayer from "../components/LivePlayer";
@@ -22,6 +23,15 @@ export default function Watch() {
 		category: params.get("category") ?? "",
 		icon: params.get("icon") ?? ""
 	};
+
+	useEffect(() => {
+		const title = channelInfo.name.trim();
+		document.title = title ? `OpenIPTV | ${title}` : "OpenIPTV";
+
+		return () => {
+			document.title = "OpenIPTV";
+		};
+	}, [channelInfo.name]);
 
 	if (channelInfo.type === "live_tv") {
 		return <LivePlayer streamUrl={streamUrl} channelInfo={channelInfo} />;

@@ -20,6 +20,11 @@ function getEpisodeTitle(episode: SeriesEpisode): string {
 	return episode.title ? `${prefix} - ${episode.title}` : prefix;
 }
 
+function getEpisodeWindowTitle(seriesTitle: string, season: string, episode: SeriesEpisode): string {
+	const episodeLabel = episode.episode_num ? `Episode ${episode.episode_num}` : "Episode";
+	return `${seriesTitle} Saison ${season} ${episodeLabel}`;
+}
+
 function getEpisodeSubtitles(episode: SeriesEpisode, domain: string): SubtitleTrack[] {
 	return extractSubtitleTracks(
 		[
@@ -116,7 +121,14 @@ export default function SeriesDetail() {
 	const activeEpisodes = [...(activeSeasonEntry?.[1] ?? [])].sort(
 		(a, b) => Number(a.episode_num ?? 0) - Number(b.episode_num ?? 0)
 	);
+	const episodeSeasonById = seasons.reduce<Record<string, string>>((seasonMap, [season, episodes]) => {
+		for (const episode of episodes) {
+			seasonMap[String(episode.id)] = season;
+		}
+		return seasonMap;
+	}, {});
 	const watchItems = orderedEpisodes.map((episode) => {
+		const season = episodeSeasonById[String(episode.id)] ?? "";
 		const streamUrl = generateStreamUrl(
 			stream.domain,
 			"series",
@@ -128,7 +140,7 @@ export default function SeriesDetail() {
 		const route = buildWatchRoute({
 			src: streamUrl,
 			type: "vod",
-			channel: getEpisodeTitle(episode),
+			channel: getEpisodeWindowTitle(title, season, episode),
 			category: title,
 			icon: episode.info?.movie_image || seriesInfo.info?.cover
 		});
@@ -194,9 +206,6 @@ export default function SeriesDetail() {
 							<div>
 								<div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
 									<span className="rounded-full bg-secondary-400/15 px-3 py-1 font-bold text-secondary-400">Series</span>
-									{releaseYear && (
-										<span className="rounded-full bg-white/10 px-3 py-1 font-semibold text-secondary-800">{releaseYear}</span>
-									)}
 								</div>
 								<h1 className="text-4xl font-bold leading-tight text-white md:text-5xl">{title}</h1>
 							</div>
@@ -204,7 +213,7 @@ export default function SeriesDetail() {
 						</div>
 
 						<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-							<StarRating value={seriesInfo.info.rating} scale={10} size="md" showValue />
+							<StarRating value={seriesInfo.info.rating} scale={10} size="md"  />
 							{releaseDate && (
 								<span className="inline-flex items-center gap-1.5 text-secondary-700">
 									<CalendarDaysIcon className="h-4 w-4 text-secondary-400" />
