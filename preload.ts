@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld("openIptv", {
 		ipcRenderer.invoke("media:resolve-playable-stream", streamUrl),
 
 	probeStreamInfo: (streamUrl: string) =>
-		ipcRenderer.invoke("media:probe-stream-info", streamUrl)
+		ipcRenderer.invoke("media:probe-stream-info", streamUrl),
+
+	stopTranscoding: () =>
+		ipcRenderer.invoke("media:stop-transcoding")
 });

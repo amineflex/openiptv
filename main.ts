@@ -106,11 +106,22 @@ interface ExtractResult {
 	error?: string;
 }
 
+interface AudioStreamInfo {
+	index: number;
+	codec: string;
+	language?: string;
+	title?: string;
+	isDefault?: boolean;
+}
+
 interface PlayableStreamResult {
 	ok: boolean;
 	url: string;
 	transcoded: boolean;
 	audioCodecs: string[];
+	audioTracks?: AudioStreamInfo[];
+	transcodeBaseUrl?: string;
+	defaultAudioIndex?: number;
 	durationSeconds?: number;
 	error?: string;
 }
@@ -120,6 +131,10 @@ interface AudioProbeStream {
 	codec_name?: string;
 	disposition?: {
 		default?: number;
+	};
+	tags?: {
+		language?: string;
+		title?: string;
 	};
 }
 
@@ -145,6 +160,48 @@ const UNSUPPORTED_BROWSER_AUDIO_CODECS = new Set(["ac3", "eac3", "truehd", "dts"
 const transcodeSources = new Map<string, string>();
 let transcodeServer: http.Server | null = null;
 let transcodeServerPort: number | null = null;
+
+// Every running ffmpeg transcode process. The app only ever plays one video at a
+// time, so a process still alive here when a new one starts is stale and leaking.
+type TranscodeProcess = ReturnType<typeof spawn>;
+const activeTranscodes = new Set<TranscodeProcess>();
+
+function killTranscode(proc: TranscodeProcess): void {
+	activeTranscodes.delete(proc);
+
+	// Already exited — nothing to do.
+	if (proc.exitCode !== null || proc.signalCode !== null) return;
+
+	try {
+		proc.stdout?.unpipe();
+		proc.stdout?.destroy();
+		proc.kill(); // SIGTERM (immediate TerminateProcess on Windows)
+	} catch (error) {
+		logger.warn("Failed to terminate transcode process", {
+			error: error instanceof Error ? error.message : String(error)
+		});
+		return;
+	}
+
+	// Fallback: force-kill if it ignored the first signal (POSIX only; on Windows
+	// the first kill already terminates the process).
+	const forceTimer = setTimeout(() => {
+		if (proc.exitCode === null && proc.signalCode === null) {
+			try {
+				proc.kill("SIGKILL");
+			} catch {
+				/* process is already gone */
+			}
+		}
+	}, 1500);
+	forceTimer.unref();
+}
+
+function killAllTranscodes(): void {
+	for (const proc of [...activeTranscodes]) {
+		killTranscode(proc);
+	}
+}
 
 function parseDurationSeconds(value: string | undefined): number | undefined {
 	if (!value) return undefined;
@@ -214,6 +271,7 @@ function ensureTranscodeServer(): Promise<number> {
 			const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
 			const match = requestUrl.pathname.match(/^\/transcode\/([^/]+)$/);
 			const startTime = Math.max(0, Number(requestUrl.searchParams.get("start") ?? 0) || 0);
+			const audioIndex = Math.max(0, Math.trunc(Number(requestUrl.searchParams.get("audio") ?? 0)) || 0);
 
 			if (!match) {
 				logger.warn("Transcode request did not match a known route", {
@@ -234,6 +292,11 @@ function ensureTranscodeServer(): Promise<number> {
 				return;
 			}
 
+			// Only one video plays at a time: terminate any prior transcode (the
+			// previous movie, or the pre-seek / pre-audio-switch position) so ffmpeg
+			// processes can never accumulate.
+			killAllTranscodes();
+
 			response.writeHead(200, {
 				"Access-Control-Allow-Origin": "*",
 				"Cache-Control": "no-store",
@@ -247,7 +310,7 @@ function ensureTranscodeServer(): Promise<number> {
 				...(startTime > 0 ? ["-ss", startTime.toFixed(3)] : []),
 				"-i", sourceUrl,
 				"-map", "0:v:0?",
-				"-map", "0:a:0?",
+				"-map", `0:a:${audioIndex}?`,
 				"-vf", "setpts=PTS-STARTPTS",
 				"-c:v", "libx264",
 				"-preset", "veryfast",
@@ -265,17 +328,31 @@ function ensureTranscodeServer(): Promise<number> {
 				"pipe:1"
 			];
 			const proc = spawn("ffmpeg", args);
+			activeTranscodes.add(proc);
+
+			// Drain stderr: if nobody reads it, a full OS pipe buffer makes ffmpeg
+			// block mid-write and freeze, which then ignores the dead stdout pipe.
+			proc.stderr.on("data", () => { /* discarded — loglevel is "error" */ });
 
 			proc.stdout.pipe(response);
+
 			proc.on("error", (error) => {
 				logger.exception("Failed to run ffmpeg transcode process", error, {
 					sourceUrl,
 					startTime
 				});
+				killTranscode(proc);
 			});
-			request.on("close", () => {
-				if (!proc.killed) proc.kill("SIGKILL");
+			proc.on("close", () => {
+				activeTranscodes.delete(proc);
 			});
+
+			// The <video> went away — switched movie, sought, or the player
+			// unmounted. Chromium tears down the streaming response, so listen on
+			// both ends (response close is the reliable one here) and kill ffmpeg.
+			response.on("close", () => killTranscode(proc));
+			request.on("close", () => killTranscode(proc));
+			request.on("aborted", () => killTranscode(proc));
 		});
 
 		server.on("error", (error) => {
@@ -462,21 +539,38 @@ ipcMain.handle("media:resolve-playable-stream", async (_event, rawUrl: unknown):
 		const audioStreams = probeResult.streams;
 		const audioCodecs = audioStreams.map((stream) => (stream.codec_name ?? "unknown").toLowerCase());
 
+		const audioTracks: AudioStreamInfo[] = audioStreams.map((stream) => ({
+			index: stream.index,
+			codec: stream.codec_name ?? "unknown",
+			language: stream.tags?.language,
+			title: stream.tags?.title,
+			isDefault: stream.disposition?.default === 1
+		}));
+
+		const defaultIdx = audioStreams.findIndex((s) => s.disposition?.default === 1);
+		const defaultAudioIndex = defaultIdx >= 0 ? defaultIdx : 0;
+
 		if (!shouldTranscodeAudio(audioStreams)) {
 			return {
 				ok: true,
 				url,
 				transcoded: false,
 				audioCodecs,
+				audioTracks,
+				defaultAudioIndex,
 				durationSeconds: probeResult.durationSeconds
 			};
 		}
 
+		const transcodeBaseUrl = await createTranscodedAudioUrl(url);
 		return {
 			ok: true,
-			url: await createTranscodedAudioUrl(url),
+			url: transcodeBaseUrl,
 			transcoded: true,
 			audioCodecs,
+			audioTracks,
+			transcodeBaseUrl,
+			defaultAudioIndex,
 			durationSeconds: probeResult.durationSeconds
 		};
 	} catch (error) {
@@ -547,8 +641,17 @@ ipcMain.handle("media:probe-stream-info", (_event, rawUrl: unknown): Promise<Pro
 	});
 });
 
+// Lets the renderer proactively stop transcoding when the player unmounts (e.g.
+// the user backs out to the menu without starting another movie), instead of
+// relying solely on the streaming connection tearing down.
+ipcMain.handle("media:stop-transcoding", () => {
+	killAllTranscodes();
+	return { ok: true };
+});
+
 app.on("before-quit", () => {
 	logger.info("Electron app is quitting");
+	killAllTranscodes();
 	transcodeServer?.close();
 	transcodeServer = null;
 	transcodeServerPort = null;

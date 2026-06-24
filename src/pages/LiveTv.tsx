@@ -191,7 +191,9 @@ export default function LiveTv() {
 											channels: channelSwitcherItems,
 											categories: categorySwitcherItems,
 											selectedCategoryId: selectedCategory?.category_id ?? "",
-											profileId: id
+											profileId: id,
+											backTo: `/menu/${id}/tv`,
+											backLabel: "Live TV"
 										}}
 											className="group flex min-h-[112px] items-center gap-4 rounded-xl border border-white/10 bg-primary/10 p-4 text-left text-secondary shadow-lg shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-secondary-400/10"
 										>

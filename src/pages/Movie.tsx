@@ -191,7 +191,7 @@ export default function Movie() {
 						<div className="mt-6 flex flex-wrap items-center gap-3">
 							<Link
 								to={watchRoute}
-								state={{ subtitles }}
+								state={{ subtitles, backTo: `/menu/${id}/movies/v/${movieId}`, backLabel: movieName }}
 								className="inline-flex items-center gap-2 rounded-xl bg-secondary-400 px-7 py-3 text-base font-bold text-dark shadow-lg shadow-secondary-400/30 transition hover:scale-105 hover:bg-secondary"
 							>
 								<PlayIcon className="h-5 w-5" />

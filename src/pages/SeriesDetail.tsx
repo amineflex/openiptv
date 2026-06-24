@@ -334,7 +334,9 @@ export default function SeriesDetail() {
 									to={watchItem.route}
 									state={{
 										subtitles: watchItem.subtitles,
-										nextEpisode: nextByEpisodeId[String(episode.id)]
+										nextEpisode: nextByEpisodeId[String(episode.id)],
+										backTo: `/menu/${id}/series/v/${seriesId}`,
+										backLabel: title
 									}}
 									className="group flex min-h-[132px] gap-4 rounded-xl border border-white/10 bg-primary/10 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-xl hover:shadow-secondary-400/10"
 								>

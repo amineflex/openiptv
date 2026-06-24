@@ -11,6 +11,8 @@ interface WatchState {
 	categories?: GuideCategoryItem[];
 	selectedCategoryId?: string;
 	profileId?: string;
+	backTo?: string;
+	backLabel?: string;
 }
 
 export default function Watch() {
@@ -46,6 +48,8 @@ export default function Watch() {
 				categories={state?.categories ?? []}
 				selectedCategoryId={state?.selectedCategoryId ?? ""}
 				profileId={state?.profileId}
+				backTo={state?.backTo}
+				backLabel={state?.backLabel}
 			/>
 		);
 	}
@@ -56,6 +60,8 @@ export default function Watch() {
 			channelInfo={{ ...channelInfo, type: "vod" }}
 			subtitles={state?.subtitles ?? []}
 			nextEpisode={state?.nextEpisode}
+			backTo={state?.backTo}
+			backLabel={state?.backLabel}
 		/>
 	);
 }

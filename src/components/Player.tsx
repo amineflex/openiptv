@@ -23,6 +23,8 @@ interface PlayerProps {
 	channelInfo: ChannelInfo;
 	subtitles?: SubtitleTrack[];
 	nextEpisode?: WatchNextEpisode;
+	backTo?: string;
+	backLabel?: string;
 }
 
 function formatTime(value: number): string {
@@ -42,7 +44,7 @@ function progressStyle(value: number, max = 100) {
 	};
 }
 
-export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpisode }: PlayerProps) {
+export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpisode, backTo, backLabel }: PlayerProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const navigate = useNavigate();
 	const [isHovered, setIsHovered] = useState(true);
@@ -56,6 +58,7 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 
 	const {
 		audioTracks,
+		probeAudioTracks,
 		currentTime,
 		duration,
 		isBuffering,
@@ -84,12 +87,22 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 	const playNextEpisode = () => {
 		if (!nextEpisode) return;
 
+		// Replace so the watch history never stacks episode after episode — the
+		// back button stays pointed at the page the user actually came from.
 		navigate(nextEpisode.route, {
+			replace: true,
 			state: {
 				subtitles: nextEpisode.subtitles ?? [],
-				nextEpisode: nextEpisode.nextEpisode
+				nextEpisode: nextEpisode.nextEpisode,
+				backTo,
+				backLabel
 			}
 		});
+	};
+
+	const handleBack = () => {
+		if (backTo) navigate(backTo, { replace: true });
+		else navigate(-1);
 	};
 
 	return (
@@ -127,16 +140,27 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 					<div className="flex min-w-0 items-center gap-3">
 						<button
 							type="button"
-							onClick={() => navigate(-1)}
-							className="rounded-full bg-white/10 p-2 text-white hover:bg-secondary-400 hover:text-dark"
+							onClick={handleBack}
+							title={backLabel ? `Retour — ${backLabel}` : "Retour"}
+							className="flex flex-none items-center gap-1.5 rounded-full bg-white/10 py-2 pl-2 pr-3.5 text-white transition-colors hover:bg-secondary-400 hover:text-dark"
 						>
-							<ArrowLeftIcon className="h-6 w-6" />
+							<ArrowLeftIcon className="h-6 w-6 flex-none" />
+							<span className="max-w-[28vw] truncate text-sm font-semibold">{backLabel ?? "Retour"}</span>
 						</button>
 						<div className="min-w-0">
 							<h1 className="truncate text-lg font-bold text-white">{channelInfo.name}</h1>
 							{channelInfo.category && <p className="truncate text-sm text-secondary-800">{channelInfo.category}</p>}
 						</div>
 					</div>
+
+					<button
+						type="button"
+						onClick={() => setIsInfoOpen(true)}
+						title="Stream info"
+						className={`flex-none rounded-full bg-white/10 p-2 hover:bg-white/20 ${isInfoOpen ? "text-secondary-400" : "text-white"}`}
+					>
+						<InformationCircleIcon className="h-6 w-6" />
+					</button>
 				</div>
 			</div>
 
@@ -218,14 +242,6 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 						>
 							<ChatBubbleBottomCenterTextIcon className="h-6 w-6" />
 						</button>
-						<button
-							type="button"
-							onClick={() => setIsInfoOpen(true)}
-							title="Stream info"
-							className={`rounded-full p-2 hover:bg-white/10 ${isInfoOpen ? "text-secondary-400" : "text-secondary-700 hover:text-white"}`}
-						>
-							<InformationCircleIcon className="h-6 w-6" />
-						</button>
 						{isPictureInPictureSupported && (
 							<button
 								type="button"
@@ -260,22 +276,41 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 						<div className="space-y-6">
 							<div>
 								<label className="mb-2 block text-xs font-bold uppercase text-gray-400">Audio Track</label>
-								<Select
-									value={selectedAudioIndex}
-									onChange={(event) => changeAudioTrack(Number(event.target.value))}
-									className="block w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none"
-									disabled={audioTracks.length === 0}
-								>
-									{audioTracks.length === 0 ? (
-										<option value={0} className="bg-gray-900">Default audio</option>
-									) : (
-										audioTracks.map((track, index) => (
-											<option key={index} value={index} className="bg-gray-900">
-												{track.language?.toUpperCase() || `Track ${index + 1}`} {track.label ? `- ${track.label}` : ""}
-											</option>
-										))
-									)}
-								</Select>
+								{(() => {
+									const hasProbe = probeAudioTracks.length > 0;
+									const hasNative = audioTracks.length > 0;
+									const count = hasProbe ? probeAudioTracks.length : audioTracks.length;
+									return (
+										<Select
+											value={selectedAudioIndex}
+											onChange={(event) => changeAudioTrack(Number(event.target.value))}
+											className="block w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none"
+											disabled={count === 0}
+										>
+											{hasProbe ? (
+												probeAudioTracks.map((track, index) => {
+													const lang = track.language?.trim().toUpperCase() || "";
+													const title = track.title?.trim() || "";
+													const label = [lang, title].filter(Boolean).join(" — ")
+														|| `Track ${index + 1} (${track.codec})`;
+													return (
+														<option key={index} value={index} className="bg-gray-900">
+															{label}
+														</option>
+													);
+												})
+											) : hasNative ? (
+												audioTracks.map((track, index) => (
+													<option key={index} value={index} className="bg-gray-900">
+														{track.language?.toUpperCase() || `Track ${index + 1}`}{track.label ? ` — ${track.label}` : ""}
+													</option>
+												))
+											) : (
+												<option value={0} className="bg-gray-900">Default audio</option>
+											)}
+										</Select>
+									);
+								})()}
 							</div>
 
 							<div>

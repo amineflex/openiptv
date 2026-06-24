@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import { PlusIcon, TvIcon, TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
-import { Link } from "react-router-dom";
+import { PlusIcon, TvIcon } from "@heroicons/react/24/outline";
+import StreamCard from "./StreamCard";
 import { storageService } from "../services/storageService";
 import type { IptvStream, StreamInput } from "../types";
 
@@ -65,39 +65,12 @@ export default function AddStream() {
 	return (
 		<>
 			{streams.map((stream) => (
-				<div key={stream.id} className="group relative">
-					<Link
-						to={`/menu/${stream.id}`}
-						className="flex h-full min-h-[190px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-br from-primary/30 to-dark/40 p-6 text-center shadow-lg shadow-black/30 transition duration-200 hover:-translate-y-1 hover:border-secondary-400/60 hover:shadow-xl hover:shadow-secondary-400/20"
-					>
-						<span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary-400/15 text-secondary-400 ring-1 ring-secondary-400/30 transition group-hover:bg-secondary-400 group-hover:text-dark">
-							<TvIcon className="h-8 w-8" />
-						</span>
-						<div className="min-w-0">
-							<p className="truncate text-lg font-bold text-white">{stream.name}</p>
-							<p className="mt-0.5 max-w-[13rem] truncate text-xs text-secondary-700">{stream.domain}</p>
-						</div>
-					</Link>
-
-					<div className="absolute right-3 top-3 flex gap-1.5 opacity-0 transition duration-150 group-hover:opacity-100">
-						<button
-							type="button"
-							onClick={() => openEdit(stream)}
-							title="Edit"
-							className="rounded-full bg-dark/70 p-2 text-secondary-400 backdrop-blur hover:bg-secondary-400 hover:text-dark"
-						>
-							<PencilIcon className="h-4 w-4" />
-						</button>
-						<button
-							type="button"
-							onClick={() => deleteStream(stream.id)}
-							title="Delete"
-							className="rounded-full bg-dark/70 p-2 text-red-300 backdrop-blur hover:bg-red-500 hover:text-white"
-						>
-							<TrashIcon className="h-4 w-4" />
-						</button>
-					</div>
-				</div>
+				<StreamCard
+					key={stream.id}
+					stream={stream}
+					onEdit={openEdit}
+					onDelete={deleteStream}
+				/>
 			))}
 
 			<button

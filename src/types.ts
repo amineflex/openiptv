@@ -159,11 +159,22 @@ export interface EmbeddedSubtitleExtractResult {
 	error?: string;
 }
 
+export interface AudioStreamInfo {
+	index: number;
+	codec: string;
+	language?: string;
+	title?: string;
+	isDefault?: boolean;
+}
+
 export interface PlayableStreamResult {
 	ok: boolean;
 	url: string;
 	transcoded: boolean;
 	audioCodecs: string[];
+	audioTracks?: AudioStreamInfo[];
+	transcodeBaseUrl?: string;
+	defaultAudioIndex?: number;
 	durationSeconds?: number;
 	error?: string;
 }

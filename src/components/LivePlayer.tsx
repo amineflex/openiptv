@@ -31,6 +31,8 @@ interface LivePlayerProps {
 	categories?: GuideCategoryItem[];
 	selectedCategoryId?: string;
 	profileId?: string;
+	backTo?: string;
+	backLabel?: string;
 }
 
 function progressStyle(value: number, max = 1) {
@@ -50,7 +52,9 @@ export default function LivePlayer({
 	channels = [],
 	categories = [],
 	selectedCategoryId = "",
-	profileId
+	profileId,
+	backTo,
+	backLabel
 }: LivePlayerProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const navigate = useNavigate();
@@ -246,15 +250,25 @@ export default function LivePlayer({
 
 	const switchToChannel = useCallback((url: string) => {
 		setIsChannelGuideOpen(false);
+		// Replace so zapping channels doesn't pile up watch entries — back always
+		// returns to the channel list, not the previous channel.
 		navigate(url, {
+			replace: true,
 			state: {
 				channels: guideChannels,
 				categories,
 				selectedCategoryId: guideCategoryId,
-				profileId
+				profileId,
+				backTo,
+				backLabel
 			}
 		});
-	}, [navigate, guideChannels, categories, guideCategoryId, profileId]);
+	}, [navigate, guideChannels, categories, guideCategoryId, profileId, backTo, backLabel]);
+
+	const handleBack = () => {
+		if (backTo) navigate(backTo, { replace: true });
+		else navigate(-1);
+	};
 
 	const switchRef = useRef(switchToChannel);
 	useEffect(() => { switchRef.current = switchToChannel; }, [switchToChannel]);
@@ -361,10 +375,12 @@ export default function LivePlayer({
 				<div className="flex items-center gap-4">
 					<button
 						type="button"
-						onClick={() => navigate(-1)}
-						className="rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-secondary-400 hover:text-dark"
+						onClick={handleBack}
+						title={backLabel ? `Retour — ${backLabel}` : "Retour"}
+						className="flex flex-none items-center gap-1.5 rounded-full bg-white/10 py-2 pl-2 pr-3.5 text-white transition-colors hover:bg-secondary-400 hover:text-dark"
 					>
-						<ArrowLeftIcon className="h-6 w-6" />
+						<ArrowLeftIcon className="h-6 w-6 flex-none" />
+						<span className="max-w-[28vw] truncate text-sm font-semibold">{backLabel ?? "Retour"}</span>
 					</button>
 
 					{channelInfo.icon && (
@@ -382,6 +398,17 @@ export default function LivePlayer({
 							<p className="truncate text-sm text-secondary-800">{channelInfo.category}</p>
 						)}
 					</div>
+
+					<button
+						type="button"
+						onClick={() => setIsInfoOpen(true)}
+						title="Stream info"
+						className={`flex-none rounded-full bg-white/10 p-2 transition-colors hover:bg-white/20 ${
+							isInfoOpen ? "text-secondary-400" : "text-white"
+						}`}
+					>
+						<InformationCircleIcon className="h-6 w-6" />
+					</button>
 				</div>
 			</div>
 
@@ -462,17 +489,6 @@ export default function LivePlayer({
 								<ArrowTopRightOnSquareIcon className="h-6 w-6" />
 							</button>
 						)}
-
-						<button
-							type="button"
-							onClick={() => setIsInfoOpen(true)}
-							title="Stream info"
-							className={`rounded-full p-2 transition-colors hover:bg-white/10 ${
-								isInfoOpen ? "text-secondary-400" : "text-secondary-700 hover:text-white"
-							}`}
-						>
-							<InformationCircleIcon className="h-6 w-6" />
-						</button>
 
 						<button
 							type="button"

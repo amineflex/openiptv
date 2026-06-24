@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createLogger } from "../services/logger";
-import type { ContentType, EmbeddedSubtitleTrack, SubtitleTrack } from "../types";
+import type { AudioStreamInfo, ContentType, EmbeddedSubtitleTrack, SubtitleTrack } from "../types";
 
 interface PlayerSubtitleTrack extends SubtitleTrack {
 	renderSrc: string;
@@ -94,9 +94,10 @@ async function prepareSubtitleTrack(
 	}
 }
 
-function buildSeekableTranscodeUrl(url: string, startTime: number): string {
+function buildSeekableTranscodeUrl(url: string, startTime: number, audioIndex = 0): string {
 	const nextUrl = new URL(url);
 	nextUrl.searchParams.set("start", Math.max(0, startTime).toFixed(3));
+	nextUrl.searchParams.set("audio", String(audioIndex));
 	return nextUrl.toString();
 }
 
@@ -107,7 +108,9 @@ export function useVideoPlayer(
 	subtitles: SubtitleTrack[] = []
 ) {
 	const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+	const [probeAudioTracks, setProbeAudioTracks] = useState<AudioStreamInfo[]>([]);
 	const [selectedAudioIndex, setSelectedAudioIndex] = useState(0);
+	const [selectedTranscodeAudioIndex, setSelectedTranscodeAudioIndex] = useState(0);
 	const [subtitleTracks, setSubtitleTracks] = useState<PlayerSubtitleTrack[]>([]);
 	const [embeddedSubtitleTracks, setEmbeddedSubtitleTracks] = useState<EmbeddedSubtitleTrack[]>([]);
 	const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>("off");
@@ -187,17 +190,30 @@ export function useVideoPlayer(
 		setIsTranscodedStream(false);
 		setStreamOffset(0);
 		setCurrentTime(0);
+		setProbeAudioTracks([]);
+		setSelectedTranscodeAudioIndex(0);
 		setIsBuffering(true);
 
 		const resolvePlayableUrl = async () => {
 			try {
 				const result = await window.openIptv?.resolvePlayableStream(streamUrl);
 				if (cancelled) return;
+
+				const tracks = result?.audioTracks ?? [];
+				const defaultAudioIdx = result?.defaultAudioIndex ?? 0;
+				setProbeAudioTracks(tracks);
+				setSelectedTranscodeAudioIndex(defaultAudioIdx);
+				if (defaultAudioIdx !== 0) setSelectedAudioIndex(defaultAudioIdx);
+
 				const nextUrl = result?.ok && result.url ? result.url : streamUrl;
 				const shouldUseTranscodeSeek = Boolean(result?.ok && result.transcoded);
 				setResolvedStreamUrl(nextUrl);
 				setIsTranscodedStream(shouldUseTranscodeSeek);
-				setPlayableStreamUrl(shouldUseTranscodeSeek ? buildSeekableTranscodeUrl(nextUrl, 0) : nextUrl);
+				setPlayableStreamUrl(
+					shouldUseTranscodeSeek
+						? buildSeekableTranscodeUrl(nextUrl, 0, defaultAudioIdx)
+						: nextUrl
+				);
 				setDurationOverride(
 					result?.durationSeconds && result.durationSeconds > 0 ? result.durationSeconds : null
 				);
@@ -220,6 +236,9 @@ export function useVideoPlayer(
 
 		return () => {
 			cancelled = true;
+			// Proactively stop any server-side transcode for the stream we're
+			// leaving, so ffmpeg doesn't linger when backing out to the menu.
+			void window.openIptv?.stopTranscoding?.();
 		};
 	}, [streamUrl, type]);
 
@@ -480,13 +499,13 @@ export function useVideoPlayer(
 			setStreamOffset(nextTime);
 			setCurrentTime(nextTime);
 			setIsBuffering(true);
-			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, nextTime));
+			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, nextTime, selectedTranscodeAudioIndex));
 			return;
 		}
 
 		video.currentTime = nextTime;
 		setCurrentTime(video.currentTime);
-	}, [durationOverride, isTranscodedStream, resolvedStreamUrl, videoRef]);
+	}, [durationOverride, isTranscodedStream, resolvedStreamUrl, selectedTranscodeAudioIndex, videoRef]);
 
 	const setVolume = useCallback((value: number) => {
 		const video = videoRef.current;
@@ -515,16 +534,27 @@ export function useVideoPlayer(
 		}
 	}, [videoRef]);
 
-	const changeAudioTrack = useCallback((index: number) => {
+	const changeAudioTrack = useCallback((relativeIndex: number) => {
+		// Transcoded stream: rebuild URL with new audio track index and current position.
+		if (isTranscodedStream && resolvedStreamUrl) {
+			setSelectedTranscodeAudioIndex(relativeIndex);
+			setSelectedAudioIndex(relativeIndex);
+			setIsBuffering(true);
+			setStreamOffset(currentTime);
+			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, currentTime, relativeIndex));
+			return;
+		}
+
+		// Native multi-track path (experimental video.audioTracks API).
 		const tracks = videoRef.current?.audioTracks;
 		if (!tracks) return;
 
 		for (let i = 0; i < tracks.length; i++) {
-			tracks[i].enabled = i === index;
+			tracks[i].enabled = i === relativeIndex;
 		}
-		setSelectedAudioIndex(index);
+		setSelectedAudioIndex(relativeIndex);
 		setAudioTracks(Array.from(tracks));
-	}, [videoRef]);
+	}, [currentTime, isTranscodedStream, resolvedStreamUrl, videoRef]);
 
 	useEffect(() => {
 		if (type !== "vod") return;
@@ -546,6 +576,7 @@ export function useVideoPlayer(
 
 	return {
 		audioTracks,
+		probeAudioTracks,
 		currentTime,
 		duration,
 		isBuffering,

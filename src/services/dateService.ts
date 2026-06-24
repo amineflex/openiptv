@@ -40,3 +40,34 @@ export function formatXtreamDate(value?: string | number | null): string {
 
 	return Number.isNaN(date.getTime()) ? "Unknown" : dateFormatter.format(date);
 }
+
+export type ExpiryTone = "ok" | "soon" | "expired" | "unknown";
+
+export interface ExpiryInfo {
+	formatted: string;
+	daysLeft: number | null;
+	tone: ExpiryTone;
+}
+
+/**
+ * Turn a raw Xtream `exp_date` into a formatted date plus an urgency tone,
+ * so the UI can colour-code how close the subscription is to running out.
+ */
+export function getExpiryInfo(value?: string | number | null): ExpiryInfo {
+	if (value === null || value === undefined || String(value).trim() === "") {
+		return { formatted: "Unknown", daysLeft: null, tone: "unknown" };
+	}
+
+	const raw = String(value).trim();
+	const numeric = Number(raw);
+	const date = Number.isFinite(numeric) ? new Date(numeric * 1000) : new Date(raw);
+
+	if (Number.isNaN(date.getTime())) {
+		return { formatted: "Unknown", daysLeft: null, tone: "unknown" };
+	}
+
+	const daysLeft = Math.ceil((date.getTime() - Date.now()) / 86_400_000);
+	const tone: ExpiryTone = daysLeft < 0 ? "expired" : daysLeft <= 7 ? "soon" : "ok";
+
+	return { formatted: dateFormatter.format(date), daysLeft, tone };
+}

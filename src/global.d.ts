@@ -15,6 +15,7 @@ declare global {
 			) => Promise<EmbeddedSubtitleExtractResult>;
 			resolvePlayableStream: (streamUrl: string) => Promise<PlayableStreamResult>;
 			probeStreamInfo: (streamUrl: string) => Promise<StreamInfoResult>;
+			stopTranscoding: () => Promise<{ ok: boolean }>;
 		};
 	}
 
