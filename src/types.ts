@@ -200,3 +200,36 @@ export interface GuideCategoryItem {
 	id: string;
 	name: string;
 }
+
+export interface StreamProbeStream {
+	index: number;
+	codec_type: string;
+	codec_name?: string;
+	codec_long_name?: string;
+	width?: number;
+	height?: number;
+	r_frame_rate?: string;
+	avg_frame_rate?: string;
+	pix_fmt?: string;
+	profile?: string;
+	channels?: number;
+	channel_layout?: string;
+	sample_rate?: string;
+	bit_rate?: string;
+	tags?: { language?: string; title?: string };
+}
+
+export interface StreamProbeFormat {
+	format_name?: string;
+	format_long_name?: string;
+	duration?: string;
+	bit_rate?: string;
+	nb_streams?: number;
+}
+
+export interface StreamInfoResult {
+	ok: boolean;
+	streams?: StreamProbeStream[];
+	format?: StreamProbeFormat;
+	error?: string;
+}

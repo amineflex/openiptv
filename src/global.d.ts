@@ -1,7 +1,8 @@
 import type {
 	EmbeddedSubtitleExtractResult,
 	EmbeddedSubtitleListResult,
-	PlayableStreamResult
+	PlayableStreamResult,
+	StreamInfoResult
 } from "./types";
 
 declare global {
@@ -13,6 +14,7 @@ declare global {
 				streamIndex: number
 			) => Promise<EmbeddedSubtitleExtractResult>;
 			resolvePlayableStream: (streamUrl: string) => Promise<PlayableStreamResult>;
+			probeStreamInfo: (streamUrl: string) => Promise<StreamInfoResult>;
 		};
 	}
 

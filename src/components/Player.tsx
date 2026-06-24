@@ -3,6 +3,7 @@ import {
 	ArrowsPointingOutIcon,
 	ChatBubbleBottomCenterTextIcon,
 	Cog6ToothIcon,
+	InformationCircleIcon,
 	PauseIcon,
 	PlayIcon,
 	ArrowTopRightOnSquareIcon,
@@ -14,6 +15,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePictureInPicture } from "../hooks/usePictureInPicture";
 import { useVideoPlayer } from "../hooks/useVideoPlayer";
+import StreamInfoPanel from "./StreamInfoPanel";
 import type { ChannelInfo, SubtitleTrack, WatchNextEpisode } from "../types";
 
 interface PlayerProps {
@@ -45,6 +47,7 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 	const navigate = useNavigate();
 	const [isHovered, setIsHovered] = useState(true);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+	const [isInfoOpen, setIsInfoOpen] = useState(false);
 	const {
 		isPictureInPicture,
 		isPictureInPictureSupported,
@@ -75,7 +78,7 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 		togglePlay
 	} = useVideoPlayer(videoRef, streamUrl, channelInfo.type, subtitles);
 
-	const controlsVisible = isHovered || isPaused || isSettingsOpen;
+	const controlsVisible = isHovered || isPaused || isSettingsOpen || isInfoOpen;
 	const canOfferNextEpisode = Boolean(nextEpisode && duration > 0 && duration - currentTime <= 45);
 
 	const playNextEpisode = () => {
@@ -215,6 +218,14 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 						>
 							<ChatBubbleBottomCenterTextIcon className="h-6 w-6" />
 						</button>
+						<button
+							type="button"
+							onClick={() => setIsInfoOpen(true)}
+							title="Stream info"
+							className={`rounded-full p-2 hover:bg-white/10 ${isInfoOpen ? "text-secondary-400" : "text-secondary-700 hover:text-white"}`}
+						>
+							<InformationCircleIcon className="h-6 w-6" />
+						</button>
 						{isPictureInPictureSupported && (
 							<button
 								type="button"
@@ -295,6 +306,12 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 					</DialogPanel>
 				</div>
 			</Dialog>
+
+			<StreamInfoPanel
+				open={isInfoOpen}
+				streamUrl={streamUrl}
+				onClose={() => setIsInfoOpen(false)}
+			/>
 		</div>
 	);
 }

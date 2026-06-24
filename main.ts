@@ -493,6 +493,60 @@ ipcMain.handle("media:resolve-playable-stream", async (_event, rawUrl: unknown):
 	}
 });
 
+interface ProbeInfoResult {
+	ok: boolean;
+	streams?: unknown[];
+	format?: unknown;
+	error?: string;
+}
+
+ipcMain.handle("media:probe-stream-info", (_event, rawUrl: unknown): Promise<ProbeInfoResult> => {
+	let url: string;
+	try {
+		url = assertHttpUrl(rawUrl);
+	} catch (error) {
+		return Promise.resolve({ ok: false, error: error instanceof Error ? error.message : "Invalid URL" });
+	}
+
+	return new Promise((resolve) => {
+		const proc = spawn("ffprobe", [
+			"-v", "quiet",
+			"-print_format", "json",
+			"-show_streams",
+			"-show_format",
+			"-analyzeduration", "2000000",
+			"-probesize", "1000000",
+			url
+		]);
+
+		let stdout = "";
+		let stderr = "";
+		proc.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+		proc.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+
+		const killTimer = setTimeout(() => { if (!proc.killed) proc.kill(); }, 10000);
+
+		proc.on("close", (code) => {
+			clearTimeout(killTimer);
+			if (code === 0 && stdout.trim()) {
+				try {
+					const parsed = JSON.parse(stdout) as { streams?: unknown[]; format?: unknown };
+					resolve({ ok: true, streams: parsed.streams ?? [], format: parsed.format });
+				} catch {
+					resolve({ ok: false, error: "Failed to parse probe output" });
+				}
+			} else {
+				resolve({ ok: false, error: stderr.trim() || `ffprobe exited with code ${code ?? "unknown"}` });
+			}
+		});
+		proc.on("error", (error) => {
+			clearTimeout(killTimer);
+			logger.exception("Failed to run ffprobe for stream info", error, { url });
+			resolve({ ok: false, error: error.message });
+		});
+	});
+});
+
 app.on("before-quit", () => {
 	logger.info("Electron app is quitting");
 	transcodeServer?.close();

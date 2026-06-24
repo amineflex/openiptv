@@ -9,12 +9,14 @@ import {
 	ArrowTopRightOnSquareIcon,
 	SpeakerWaveIcon,
 	SpeakerXMarkIcon,
-	XMarkIcon
+	XMarkIcon,
+	InformationCircleIcon
 } from "@heroicons/react/24/outline";
 import { Dialog, DialogPanel, DialogTitle, Select } from "@headlessui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePictureInPicture } from "../hooks/usePictureInPicture";
+import StreamInfoPanel from "./StreamInfoPanel";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
 import { filterAdultItems } from "../services/adultContentFilter";
@@ -67,6 +69,7 @@ export default function LivePlayer({
 	const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
 	const [selectedAudioIndex, setSelectedAudioIndex] = useState(0);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+	const [isInfoOpen, setIsInfoOpen] = useState(false);
 
 	// Channel guide state
 	const [isChannelGuideOpen, setIsChannelGuideOpen] = useState(false);
@@ -462,6 +465,17 @@ export default function LivePlayer({
 
 						<button
 							type="button"
+							onClick={() => setIsInfoOpen(true)}
+							title="Stream info"
+							className={`rounded-full p-2 transition-colors hover:bg-white/10 ${
+								isInfoOpen ? "text-secondary-400" : "text-secondary-700 hover:text-white"
+							}`}
+						>
+							<InformationCircleIcon className="h-6 w-6" />
+						</button>
+
+						<button
+							type="button"
 							onClick={toggleFullscreen}
 							className={`rounded-full p-2 transition-colors hover:bg-white/10 ${
 								isFullscreen ? "text-secondary-400" : "text-secondary-700 hover:text-white"
@@ -633,6 +647,12 @@ export default function LivePlayer({
 					</DialogPanel>
 				</div>
 			</Dialog>
+
+			<StreamInfoPanel
+				open={isInfoOpen}
+				streamUrl={streamUrl}
+				onClose={() => setIsInfoOpen(false)}
+			/>
 		</div>
 	);
 }

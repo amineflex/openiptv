@@ -8,5 +8,8 @@ contextBridge.exposeInMainWorld("openIptv", {
 		ipcRenderer.invoke("subtitle:extract-embedded", streamUrl, streamIndex),
 
 	resolvePlayableStream: (streamUrl: string) =>
-		ipcRenderer.invoke("media:resolve-playable-stream", streamUrl)
+		ipcRenderer.invoke("media:resolve-playable-stream", streamUrl),
+
+	probeStreamInfo: (streamUrl: string) =>
+		ipcRenderer.invoke("media:probe-stream-info", streamUrl)
 });
