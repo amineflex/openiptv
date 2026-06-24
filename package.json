@@ -10,7 +10,7 @@
 		"serve": "npm run build && node scripts/serve-dist.mjs",
 		"start": "electron-forge start",
 		"package": "electron-forge package",
-		"make": "electron-forge make",
+		"make": "npm run build && electron-forge make",
 		"publish": "electron-forge publish",
 		"format": "prettier --write .",
 		"lint": "eslint ."
