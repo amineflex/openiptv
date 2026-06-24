@@ -188,3 +188,15 @@ export interface WatchNextEpisode {
 	subtitles?: SubtitleTrack[];
 	nextEpisode?: WatchNextEpisode;
 }
+
+export interface ChannelSwitcherItem {
+	name: string;
+	icon: string;
+	num?: string | number;
+	url: string;
+}
+
+export interface GuideCategoryItem {
+	id: string;
+	name: string;
+}

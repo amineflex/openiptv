@@ -13,7 +13,7 @@ import { filterAdultItems, isAdultCategory } from "../services/adultContentFilte
 import { generateStreamUrl } from "../services/streamService";
 import { storageService } from "../services/storageService";
 import { buildWatchRoute } from "../services/watchRoute";
-import type { Category, LiveChannel } from "../types";
+import type { Category, ChannelSwitcherItem, GuideCategoryItem, LiveChannel } from "../types";
 
 function getChannelInitials(name: string): string {
 	const words = name.trim().split(/\s+/).filter(Boolean);
@@ -112,6 +112,34 @@ export default function LiveTv() {
 		});
 	}, [searchedChannels, selectedCategory, stream, visibleCount]);
 
+	const categorySwitcherItems = useMemo<GuideCategoryItem[]>(() =>
+		visibleCategories.map((cat) => ({ id: cat.category_id, name: cat.category_name })),
+		[visibleCategories]
+	);
+
+	const channelSwitcherItems = useMemo<ChannelSwitcherItem[]>(() => {
+		if (!stream || !selectedCategory) return [];
+		return visibleChannels.map((channel) => ({
+			name: channel.name,
+			icon: channel.stream_icon ?? "",
+			num: channel.num,
+			url: buildWatchRoute({
+				src: generateStreamUrl(
+					stream.domain,
+					"live",
+					stream.username,
+					stream.password,
+					channel.stream_id,
+					stream.settings.streamFormat
+				),
+				type: "live_tv",
+				channel: channel.name,
+				icon: channel.stream_icon,
+				category: selectedCategory.category_name
+			})
+		}));
+	}, [visibleChannels, stream, selectedCategory]);
+
 	const handleCategorySelect = (category: Category) => {
 		if (!stream) return;
 		if (!adultContentEnabled && isAdultCategory(category)) return;
@@ -159,6 +187,12 @@ export default function LiveTv() {
 										<Link
 											key={channel.stream_id}
 											to={to}
+											state={{
+											channels: channelSwitcherItems,
+											categories: categorySwitcherItems,
+											selectedCategoryId: selectedCategory?.category_id ?? "",
+											profileId: id
+										}}
 											className="group flex min-h-[112px] items-center gap-4 rounded-xl border border-white/10 bg-primary/10 p-4 text-left text-secondary shadow-lg shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-secondary-400/10"
 										>
 											<div className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-dark/70">

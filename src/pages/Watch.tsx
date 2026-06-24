@@ -2,11 +2,15 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import Player from "../components/Player";
 import LivePlayer from "../components/LivePlayer";
-import type { ContentType, SubtitleTrack, WatchNextEpisode } from "../types";
+import type { ChannelSwitcherItem, ContentType, GuideCategoryItem, SubtitleTrack, WatchNextEpisode } from "../types";
 
 interface WatchState {
 	subtitles?: SubtitleTrack[];
 	nextEpisode?: WatchNextEpisode;
+	channels?: ChannelSwitcherItem[];
+	categories?: GuideCategoryItem[];
+	selectedCategoryId?: string;
+	profileId?: string;
 }
 
 export default function Watch() {
@@ -34,7 +38,16 @@ export default function Watch() {
 	}, [channelInfo.name]);
 
 	if (channelInfo.type === "live_tv") {
-		return <LivePlayer streamUrl={streamUrl} channelInfo={channelInfo} />;
+		return (
+			<LivePlayer
+				streamUrl={streamUrl}
+				channelInfo={channelInfo}
+				channels={state?.channels ?? []}
+				categories={state?.categories ?? []}
+				selectedCategoryId={state?.selectedCategoryId ?? ""}
+				profileId={state?.profileId}
+			/>
+		);
 	}
 
 	return (
