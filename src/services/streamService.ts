@@ -1,8 +1,10 @@
 import mpegts from "mpegts.js";
 import type { StreamFormat } from "../types";
+import { createLogger } from "./logger";
 
 type StreamUrlType = "live" | "movie" | "series";
 
+const logger = createLogger("stream");
 const pathPart = (value: string | number): string => encodeURIComponent(String(value));
 
 export function generateStreamUrl(
@@ -19,7 +21,10 @@ export function generateStreamUrl(
 
 export function startStream(videoElement: HTMLVideoElement | null, streamUrl: string | null): mpegts.Player | null {
 	if (!videoElement || !streamUrl) {
-		console.error("startStream: missing videoElement or streamUrl");
+		logger.error("Cannot start live stream: missing video element or URL", {
+			hasVideoElement: Boolean(videoElement),
+			hasStreamUrl: Boolean(streamUrl)
+		});
 		return null;
 	}
 
@@ -41,7 +46,9 @@ export function startStream(videoElement: HTMLVideoElement | null, streamUrl: st
 
 		return player;
 	} catch (error) {
-		console.error("startStream: failed to initialize player", error);
+		logger.exception("Failed to initialize live stream player", error, {
+			streamUrl
+		});
 		return null;
 	}
 }

@@ -5,12 +5,14 @@ import {
 	Cog6ToothIcon,
 	PauseIcon,
 	PlayIcon,
+	ArrowTopRightOnSquareIcon,
 	SpeakerWaveIcon,
 	SpeakerXMarkIcon
 } from "@heroicons/react/24/outline";
 import { Dialog, DialogPanel, DialogTitle, Select } from "@headlessui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePictureInPicture } from "../hooks/usePictureInPicture";
 import { startStream } from "../services/streamService";
 import type { ChannelInfo } from "../types";
 
@@ -41,6 +43,11 @@ export default function LivePlayer({ streamUrl, channelInfo }: LivePlayerProps) 
 	const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
 	const [selectedAudioIndex, setSelectedAudioIndex] = useState(0);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+	const {
+		isPictureInPicture,
+		isPictureInPictureSupported,
+		togglePictureInPicture
+	} = usePictureInPicture(videoRef);
 
 	useEffect(() => {
 		mpegtsRef.current = startStream(videoRef.current, streamUrl);
@@ -257,6 +264,20 @@ export default function LivePlayer({ streamUrl, channelInfo }: LivePlayerProps) 
 								title="Audio tracks"
 							>
 								<Cog6ToothIcon className="h-6 w-6" />
+							</button>
+						)}
+
+						{isPictureInPictureSupported && (
+							<button
+								type="button"
+								onClick={() => void togglePictureInPicture()}
+								title="Picture in picture"
+								aria-label="Toggle picture in picture"
+								className={`rounded-full p-2 transition-colors hover:bg-white/10 ${
+									isPictureInPicture ? "text-secondary-400" : "text-secondary-700 hover:text-white"
+								}`}
+							>
+								<ArrowTopRightOnSquareIcon className="h-6 w-6" />
 							</button>
 						)}
 

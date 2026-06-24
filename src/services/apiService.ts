@@ -1,9 +1,11 @@
 import type { Category, IptvStream, LiveChannel, SeriesInfo, SeriesItem, StreamInfo, VodInfo, VodStream } from "../types";
+import { createLogger } from "./logger";
 
 const API_TIMEOUT_MS = 15000;
 const API_HEADERS = {
 	Accept: "application/json"
 };
+const logger = createLogger("api");
 
 type XtreamParams = Record<string, string | number | boolean | undefined>;
 
@@ -36,16 +38,28 @@ async function fetchXtream<T>(
 		});
 
 		if (!response.ok) {
-			console.error(`API error [${response.status}]: ${url.pathname}`);
+			logger.error("Xtream request failed", {
+				action: params.action ?? "account_info",
+				path: url.pathname,
+				status: response.status,
+				statusText: response.statusText
+			});
 			return null;
 		}
 
 		return (await response.json()) as T;
 	} catch (error) {
 		if (error instanceof DOMException && error.name === "AbortError") {
-			console.error(`API timeout after ${API_TIMEOUT_MS}ms: ${url.pathname}`);
+			logger.warn("Xtream request timed out or was aborted", {
+				action: params.action ?? "account_info",
+				path: url.pathname,
+				timeoutMs: API_TIMEOUT_MS
+			});
 		} else {
-			console.error("API connection error:", error);
+			logger.exception("Xtream connection error", error, {
+				action: params.action ?? "account_info",
+				path: url.pathname
+			});
 		}
 		return null;
 	} finally {

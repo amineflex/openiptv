@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
+import { createLogger } from "../services/logger";
 import type { ContentType, EmbeddedSubtitleTrack, SubtitleTrack } from "../types";
 
 interface PlayerSubtitleTrack extends SubtitleTrack {
@@ -19,6 +20,15 @@ const CUE_TIMING = /^((?:\d{1,2}:)?\d{1,2}:\d{2}[.,]\d{3})\s*-->\s*((?:\d{1,2}:)
 
 // Lift cues off the very bottom so they clear the control bar (84% from the top).
 const SUBTITLE_LINE = "line:84%";
+const logger = createLogger("video-player");
+
+function isAbortError(error: unknown): boolean {
+	return error instanceof DOMException && error.name === "AbortError";
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
 
 /**
  * Normalize SubRip or WebVTT text into a clean WebVTT document and nudge every
@@ -68,7 +78,17 @@ async function prepareSubtitleTrack(
 		const text = await response.text();
 		const blob = new Blob([normalizeVtt(text)], { type: "text/vtt" });
 		return { ...track, renderSrc: URL.createObjectURL(blob) };
-	} catch {
+	} catch (error) {
+		if (!isAbortError(error)) {
+			logger.warn("Subtitle preparation failed; falling back to remote track", {
+				error: getErrorMessage(error),
+				label: track.label,
+				language: track.language,
+				src: track.src,
+				trackId: track.id
+			});
+		}
+
 		// Network/abort fallback: hand the raw URL to the <track> and hope for the best.
 		return { ...track, renderSrc: track.src };
 	}
@@ -181,8 +201,11 @@ export function useVideoPlayer(
 				setDurationOverride(
 					result?.durationSeconds && result.durationSeconds > 0 ? result.durationSeconds : null
 				);
-			} catch {
+			} catch (error) {
 				if (!cancelled) {
+					logger.exception("Failed to resolve playable VOD stream; using original URL", error, {
+						streamUrl
+					});
 					setPlayableStreamUrl(streamUrl);
 					setResolvedStreamUrl(streamUrl);
 					setDurationOverride(null);
@@ -321,9 +344,20 @@ export function useVideoPlayer(
 			try {
 				const result = await window.openIptv?.listEmbeddedSubtitles(streamUrl);
 				if (cancelled) return;
+				if (result && !result.ok) {
+					logger.warn("Embedded subtitle scan failed", {
+						error: result.error,
+						streamUrl
+					});
+				}
 				setEmbeddedSubtitleTracks(result?.ok ? result.tracks : []);
-			} catch {
-				if (!cancelled) setEmbeddedSubtitleTracks([]);
+			} catch (error) {
+				if (!cancelled) {
+					logger.exception("Failed to list embedded subtitles", error, {
+						streamUrl
+					});
+					setEmbeddedSubtitleTracks([]);
+				}
 			}
 		};
 
@@ -389,6 +423,11 @@ export function useVideoPlayer(
 			const result = await window.openIptv.extractEmbeddedSubtitle(streamUrl, embeddedTrack.index);
 
 			if (!result.ok || !result.vtt) {
+				logger.warn("Embedded subtitle extraction failed", {
+					error: result.error,
+					streamIndex: embeddedTrack.index,
+					streamUrl
+				});
 				setSubtitleError(result.error ?? "Failed to extract subtitles");
 				return;
 			}
@@ -407,6 +446,10 @@ export function useVideoPlayer(
 			setSubtitleTracks((tracks) => [...tracks.filter((track) => track.id !== id), renderedTrack]);
 			setSelectedSubtitleId(id);
 		} catch (error) {
+			logger.exception("Failed to extract embedded subtitles", error, {
+				streamIndex: embeddedTrack.index,
+				streamUrl
+			});
 			setSubtitleError(error instanceof Error ? error.message : "Failed to extract subtitles");
 		} finally {
 			setSubtitleLoadingId(null);

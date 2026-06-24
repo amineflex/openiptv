@@ -3,8 +3,18 @@ import path from "path";
 import { spawn } from "child_process";
 import http from "http";
 import { randomUUID } from "crypto";
+import { createLogger } from "./src/services/logger";
 
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+const logger = createLogger("electron-main");
+
+process.on("uncaughtException", (error) => {
+	logger.exception("Uncaught exception", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+	logger.exception("Unhandled promise rejection", reason);
+});
 
 // Expose the experimental AudioTrack API and proprietary audio decoding so
 // multi-audio MKV streams behave (these flags must be set before app is ready).
@@ -23,6 +33,10 @@ function assertHttpUrl(raw: unknown): string {
 }
 
 function createWindow() {
+	logger.info("Creating browser window", {
+		devMode: Boolean(VITE_DEV_SERVER_URL)
+	});
+
 	const win = new BrowserWindow({
 		width: 1280,
 		height: 800,
@@ -37,22 +51,34 @@ function createWindow() {
 	});
 
 	if (VITE_DEV_SERVER_URL) {
-		void win.loadURL(VITE_DEV_SERVER_URL);
+		void win.loadURL(VITE_DEV_SERVER_URL).catch((error) => {
+			logger.exception("Failed to load dev server URL", error, {
+				url: VITE_DEV_SERVER_URL
+			});
+		});
 		win.webContents.openDevTools();
 	} else {
-		void win.loadFile(path.join(__dirname, "../dist/index.html"));
+		void win.loadFile(path.join(__dirname, "../dist/index.html")).catch((error) => {
+			logger.exception("Failed to load bundled app", error);
+		});
 	}
 }
 
-app.whenReady().then(() => {
-	createWindow();
+app.whenReady()
+	.then(() => {
+		logger.info("Electron app is ready");
+		createWindow();
 
-	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
-			createWindow();
-		}
+		app.on("activate", () => {
+			if (BrowserWindow.getAllWindows().length === 0) {
+				createWindow();
+			}
+		});
+	})
+	.catch((error) => {
+		logger.exception("Failed to initialize Electron app", error);
+		app.quit();
 	});
-});
 
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
@@ -155,11 +181,20 @@ function probeAudioStreams(url: string): Promise<AudioProbeResult> {
 					streams: parsed.streams ?? [],
 					durationSeconds: parseDurationSeconds(parsed.format?.duration)
 				});
-			} catch {
+			} catch (error) {
+				logger.exception("Failed to parse audio probe output", error, {
+					stderr,
+					url
+				});
 				reject(new Error("Failed to read audio streams"));
 			}
 		});
-		proc.on("error", reject);
+		proc.on("error", (error) => {
+			logger.exception("Failed to run ffprobe for audio streams", error, {
+				url
+			});
+			reject(error);
+		});
 	});
 }
 
@@ -181,6 +216,9 @@ function ensureTranscodeServer(): Promise<number> {
 			const startTime = Math.max(0, Number(requestUrl.searchParams.get("start") ?? 0) || 0);
 
 			if (!match) {
+				logger.warn("Transcode request did not match a known route", {
+					pathname: requestUrl.pathname
+				});
 				response.writeHead(404);
 				response.end();
 				return;
@@ -188,6 +226,9 @@ function ensureTranscodeServer(): Promise<number> {
 
 			const sourceUrl = transcodeSources.get(match[1]);
 			if (!sourceUrl) {
+				logger.warn("Transcode source was not found", {
+					sourceId: match[1]
+				});
 				response.writeHead(404);
 				response.end();
 				return;
@@ -226,12 +267,21 @@ function ensureTranscodeServer(): Promise<number> {
 			const proc = spawn("ffmpeg", args);
 
 			proc.stdout.pipe(response);
+			proc.on("error", (error) => {
+				logger.exception("Failed to run ffmpeg transcode process", error, {
+					sourceUrl,
+					startTime
+				});
+			});
 			request.on("close", () => {
 				if (!proc.killed) proc.kill("SIGKILL");
 			});
 		});
 
-		server.on("error", reject);
+		server.on("error", (error) => {
+			logger.exception("Local transcode server error", error);
+			reject(error);
+		});
 		server.listen(0, "127.0.0.1", () => {
 			const address = server.address();
 			if (!address || typeof address === "string") {
@@ -242,6 +292,9 @@ function ensureTranscodeServer(): Promise<number> {
 
 			transcodeServer = server;
 			transcodeServerPort = address.port;
+			logger.info("Local transcode server started", {
+				port: address.port
+			});
 			resolve(address.port);
 		});
 	});
@@ -251,6 +304,10 @@ async function createTranscodedAudioUrl(sourceUrl: string): Promise<string> {
 	const port = await ensureTranscodeServer();
 	const id = randomUUID();
 	transcodeSources.set(id, sourceUrl);
+	logger.debug("Created local transcode source", {
+		sourceId: id,
+		sourceUrl
+	});
 	return `http://127.0.0.1:${port}/transcode/${id}`;
 }
 
@@ -259,6 +316,9 @@ ipcMain.handle("subtitle:list-embedded", async (_event, rawUrl: unknown): Promis
 	try {
 		url = assertHttpUrl(rawUrl);
 	} catch (error) {
+		logger.warn("Rejected embedded subtitle list request", {
+			error: error instanceof Error ? error.message : "Invalid URL"
+		});
 		return { ok: false, tracks: [], error: error instanceof Error ? error.message : "Invalid URL" };
 	}
 
@@ -306,11 +366,20 @@ ipcMain.handle("subtitle:list-embedded", async (_event, rawUrl: unknown): Promis
 					});
 
 				resolve({ ok: true, tracks });
-			} catch {
+			} catch (error) {
+				logger.exception("Failed to parse embedded subtitle probe output", error, {
+					stderr,
+					url
+				});
 				resolve({ ok: false, tracks: [], error: stderr.trim() || "Failed to read subtitle streams" });
 			}
 		});
-		proc.on("error", (error) => resolve({ ok: false, tracks: [], error: error.message }));
+		proc.on("error", (error) => {
+			logger.exception("Failed to run ffprobe for embedded subtitles", error, {
+				url
+			});
+			resolve({ ok: false, tracks: [], error: error.message });
+		});
 	});
 });
 
@@ -319,11 +388,17 @@ ipcMain.handle("subtitle:extract-embedded", async (_event, rawUrl: unknown, inde
 	try {
 		url = assertHttpUrl(rawUrl);
 	} catch (error) {
+		logger.warn("Rejected embedded subtitle extraction request", {
+			error: error instanceof Error ? error.message : "Invalid URL"
+		});
 		return { ok: false, error: error instanceof Error ? error.message : "Invalid URL" };
 	}
 
 	const streamIndex = Number(index);
 	if (!Number.isInteger(streamIndex) || streamIndex < 0) {
+		logger.warn("Rejected embedded subtitle extraction index", {
+			index
+		});
 		return { ok: false, error: "Invalid stream index" };
 	}
 
@@ -346,10 +421,22 @@ ipcMain.handle("subtitle:extract-embedded", async (_event, rawUrl: unknown, inde
 			if (code === 0 && output.trim().length > 0) {
 				resolve({ ok: true, vtt: output });
 			} else {
+				logger.warn("Embedded subtitle extraction process failed", {
+					code,
+					stderr,
+					streamIndex,
+					url
+				});
 				resolve({ ok: false, error: stderr.trim() || `ffmpeg exited with code ${code ?? "unknown"}` });
 			}
 		});
-		proc.on("error", (error) => resolve({ ok: false, error: error.message }));
+		proc.on("error", (error) => {
+			logger.exception("Failed to run ffmpeg for embedded subtitle extraction", error, {
+				streamIndex,
+				url
+			});
+			resolve({ ok: false, error: error.message });
+		});
 	});
 });
 
@@ -358,6 +445,9 @@ ipcMain.handle("media:resolve-playable-stream", async (_event, rawUrl: unknown):
 	try {
 		url = assertHttpUrl(rawUrl);
 	} catch (error) {
+		logger.warn("Rejected playable stream resolve request", {
+			error: error instanceof Error ? error.message : "Invalid URL"
+		});
 		return {
 			ok: false,
 			url: "",
@@ -390,6 +480,9 @@ ipcMain.handle("media:resolve-playable-stream", async (_event, rawUrl: unknown):
 			durationSeconds: probeResult.durationSeconds
 		};
 	} catch (error) {
+		logger.exception("Failed to resolve playable stream", error, {
+			url
+		});
 		return {
 			ok: false,
 			url,
@@ -401,6 +494,7 @@ ipcMain.handle("media:resolve-playable-stream", async (_event, rawUrl: unknown):
 });
 
 app.on("before-quit", () => {
+	logger.info("Electron app is quitting");
 	transcodeServer?.close();
 	transcodeServer = null;
 	transcodeServerPort = null;

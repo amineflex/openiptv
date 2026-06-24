@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeftIcon, CalendarDaysIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
 import FavouriteButton from "../components/FavouriteButton";
-import LoadingSpinner from "../components/LoadingSpinner";
 import NotFound from "../components/NotFound";
 import StarRating from "../components/StarRating";
 import { useStreamLoader } from "../hooks/useStreamLoader";
@@ -90,8 +89,58 @@ export default function SeriesDetail() {
 
 	if (loading) {
 		return (
-			<div className="bg-dark text-secondary min-h-screen">
-				<LoadingSpinner />
+			<div className="relative min-h-screen bg-dark text-secondary">
+				<div className="absolute inset-x-0 top-0 h-[420px] animate-pulse bg-white/5" />
+				<div className="relative z-10 px-6 py-5">
+					<div className="h-10 w-10 animate-pulse rounded-full bg-white/10" />
+				</div>
+				<main className="relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-12">
+					<div className="flex flex-col gap-8 md:flex-row md:items-end">
+						<div className="h-80 w-56 flex-none animate-pulse self-center rounded-2xl bg-white/10 md:self-auto" />
+						<div className="flex-1 space-y-4">
+							<div className="h-7 w-24 animate-pulse rounded-full bg-white/10" />
+							<div className="h-12 w-2/3 animate-pulse rounded-xl bg-white/10" />
+							<div className="flex flex-wrap gap-3">
+								<div className="h-6 w-20 animate-pulse rounded-full bg-white/10" />
+								<div className="h-6 w-36 animate-pulse rounded-full bg-white/10" />
+								<div className="h-6 w-32 animate-pulse rounded-full bg-white/10" />
+							</div>
+							<div className="flex gap-2">
+								<div className="h-6 w-16 animate-pulse rounded-full bg-white/10" />
+								<div className="h-6 w-20 animate-pulse rounded-full bg-white/10" />
+								<div className="h-6 w-14 animate-pulse rounded-full bg-white/10" />
+							</div>
+							<div className="space-y-2 pt-3">
+								<div className="h-4 w-full animate-pulse rounded bg-white/10" />
+								<div className="h-4 w-full animate-pulse rounded bg-white/10" />
+								<div className="h-4 w-3/4 animate-pulse rounded bg-white/10" />
+							</div>
+						</div>
+					</div>
+
+					<div className="mt-12">
+						<div className="mb-5 flex flex-col gap-4 border-b border-white/10 pb-5 md:flex-row md:items-end md:justify-between">
+							<div className="space-y-2">
+								<div className="h-8 w-32 animate-pulse rounded bg-white/10" />
+								<div className="h-4 w-40 animate-pulse rounded bg-white/10" />
+							</div>
+							<div className="h-12 w-64 animate-pulse rounded-xl bg-white/10" />
+						</div>
+						<div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+							{Array.from({ length: 6 }).map((_, i) => (
+								<div key={i} className="flex gap-4 rounded-xl border border-white/10 bg-primary/10 p-3">
+									<div className="h-28 w-40 flex-none animate-pulse rounded-lg bg-white/10" />
+									<div className="flex-1 space-y-2 py-1">
+										<div className="h-5 w-24 animate-pulse rounded-full bg-white/10" />
+										<div className="h-6 w-3/4 animate-pulse rounded bg-white/10" />
+										<div className="h-4 w-full animate-pulse rounded bg-white/10" />
+										<div className="h-4 w-4/5 animate-pulse rounded bg-white/10" />
+									</div>
+								</div>
+							))}
+						</div>
+					</div>
+				</main>
 			</div>
 		);
 	}
