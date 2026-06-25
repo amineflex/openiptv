@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { PlayIcon } from "@heroicons/react/24/solid";
 import StarRating from "./StarRating";
-
-const placeholderPoster = "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png";
+import { PLACEHOLDER_POSTER } from "../constants";
 
 interface PosterCardProps {
 	to: string;
@@ -19,11 +18,11 @@ export default function PosterCard({ to, title, image, rating, ratingScale = 10 
 			className="group relative block h-[300px] w-[200px] overflow-hidden rounded-2xl border border-white/10 bg-primary/10 shadow-lg shadow-black/30 transition duration-300 hover:-translate-y-1 hover:border-secondary-400/60 hover:shadow-xl hover:shadow-secondary-400/20"
 		>
 			<img
-				src={image || placeholderPoster}
+				src={image || PLACEHOLDER_POSTER}
 				alt={title}
 				loading="lazy"
 				onError={(e) => {
-					(e.currentTarget as HTMLImageElement).src = placeholderPoster;
+					(e.currentTarget as HTMLImageElement).src = PLACEHOLDER_POSTER;
 				}}
 				className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
 			/>

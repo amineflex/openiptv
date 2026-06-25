@@ -615,8 +615,8 @@ export default function LivePlayer({
 												isCurrent
 													? "bg-secondary-400/15 text-white"
 													: isFocused
-													? "bg-white/10 text-white"
-													: "text-secondary-800 hover:bg-white/5 hover:text-white"
+														? "bg-white/10 text-white"
+														: "text-secondary-800 hover:bg-white/5 hover:text-white"
 											}`}
 										>
 											<div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/60">

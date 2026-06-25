@@ -12,9 +12,13 @@ const https_1 = __importDefault(require("https"));
 const crypto_1 = require("crypto");
 const logger_1 = require("./src/services/logger");
 // ── Binary resolution ─────────────────────────────────────────────────────────
-// Electron GUI apps on macOS do NOT inherit the user's shell PATH (Homebrew,
-// Nix, MacPorts…). We probe known installation dirs before falling back to PATH.
-const EXTRA_BINARY_DIRS = (() => {
+// Electron GUI apps launched from Finder/Dock on macOS (and some Linux DEs) get
+// a stripped PATH that never sourced the user's shell profile — so Homebrew,
+// MacPorts, Nix, asdf… are invisible. We resolve media binaries from three
+// sources: well-known install dirs, the login shell's real PATH, and our own
+// inherited PATH. The merged PATH is also pushed back onto process.env.PATH so
+// every spawned ffmpeg/ffprobe child inherits it too.
+const WELL_KNOWN_BINARY_DIRS = (() => {
     switch (process.platform) {
         case "darwin":
             return [
@@ -24,43 +28,75 @@ const EXTRA_BINARY_DIRS = (() => {
                 "/usr/bin",
             ];
         case "linux":
-            return ["/usr/bin", "/usr/local/bin", "/snap/bin"];
+            return ["/usr/local/bin", "/usr/bin", "/snap/bin", "/var/lib/flatpak/exports/bin"];
         default:
             return []; // Windows: PATH is inherited correctly
     }
 })();
+// Ask the user's login shell for its PATH. This is the standard workaround for
+// the macOS "GUI app has no Homebrew" problem (same trick VS Code uses).
+function getLoginShellDirs() {
+    if (process.platform === "win32")
+        return [];
+    const shell = process.env.SHELL || "/bin/zsh";
+    try {
+        const result = (0, child_process_1.spawnSync)(shell, ["-ilc", 'echo "__PATH__=$PATH"'], { encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] });
+        const match = (result.stdout ?? "").match(/__PATH__=(.*)/);
+        if (match)
+            return match[1].split(path_1.default.delimiter).filter(Boolean);
+    }
+    catch {
+        /* shell missing or hung — fall back to other sources */
+    }
+    return [];
+}
+const SEARCH_DIRS = (() => {
+    const inherited = (process.env.PATH ?? "").split(path_1.default.delimiter).filter(Boolean);
+    const merged = [...WELL_KNOWN_BINARY_DIRS, ...getLoginShellDirs(), ...inherited];
+    const deduped = [...new Set(merged)];
+    // Make the enriched PATH available to every child process we spawn.
+    process.env.PATH = deduped.join(path_1.default.delimiter);
+    return deduped;
+})();
 function resolveBinary(name) {
     const exe = process.platform === "win32" ? `${name}.exe` : name;
-    for (const dir of EXTRA_BINARY_DIRS) {
+    for (const dir of SEARCH_DIRS) {
         const full = path_1.default.join(dir, exe);
         if ((0, fs_1.existsSync)(full))
             return full;
     }
-    for (const dir of (process.env.PATH ?? "").split(path_1.default.delimiter)) {
-        if (!dir)
-            continue;
-        const full = path_1.default.join(dir, exe);
-        if ((0, fs_1.existsSync)(full))
-            return full;
-    }
-    return exe; // last-resort: let the OS try
+    return exe; // last-resort: let the OS try (will ENOENT if truly absent)
 }
 const FFMPEG = resolveBinary("ffmpeg");
 const FFPROBE = resolveBinary("ffprobe");
+const FFMPEG_AVAILABLE = path_1.default.isAbsolute(FFMPEG) && path_1.default.isAbsolute(FFPROBE);
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const logger = (0, logger_1.createLogger)("electron-main");
 // Surface the resolved media binaries at startup. If either is just the bare
-// name (not an absolute path), it wasn't found in any known dir or PATH — the
-// usual cause of "no audio / no subtitles" on macOS (ffmpeg not installed, or
-// the GUI app didn't inherit Homebrew's PATH).
-logger.info("Resolved media binaries", {
-    platform: process.platform,
-    arch: process.arch,
-    ffmpeg: FFMPEG,
-    ffmpegFound: path_1.default.isAbsolute(FFMPEG),
-    ffprobe: FFPROBE,
-    ffprobeFound: path_1.default.isAbsolute(FFPROBE)
-});
+// name (not an absolute path), it wasn't found anywhere — the usual cause of
+// "no audio / no subtitles" (ffmpeg not installed at all).
+if (FFMPEG_AVAILABLE) {
+    logger.info("Resolved media binaries", {
+        platform: process.platform,
+        arch: process.arch,
+        ffmpeg: FFMPEG,
+        ffprobe: FFPROBE
+    });
+}
+else {
+    logger.error("ffmpeg/ffprobe NOT FOUND — audio transcoding & subtitles will fail", {
+        platform: process.platform,
+        arch: process.arch,
+        ffmpegFound: path_1.default.isAbsolute(FFMPEG),
+        ffprobeFound: path_1.default.isAbsolute(FFPROBE),
+        hint: process.platform === "darwin"
+            ? "Install with: brew install ffmpeg"
+            : process.platform === "linux"
+                ? "Install with your package manager, e.g. sudo apt install ffmpeg"
+                : "Install ffmpeg and ensure it is on PATH",
+        searchedDirs: SEARCH_DIRS
+    });
+}
 process.on("uncaughtException", (error) => {
     logger.exception("Uncaught exception", error);
 });
@@ -854,6 +890,11 @@ electron_1.ipcMain.handle("subtitle:list-embedded", async (_event, rawUrl) => {
         proc.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
         proc.on("close", () => {
             try {
+                if (stdout.trim().length === 0) {
+                    // ffprobe produced nothing (missing binary, unreachable URL…).
+                    resolve({ ok: false, tracks: [], error: stderr.trim() || "No probe output" });
+                    return;
+                }
                 const parsed = JSON.parse(stdout);
                 const streams = parsed.streams ?? [];
                 const tracks = streams

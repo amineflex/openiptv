@@ -25,6 +25,13 @@ export default [
 	},
 	...compat.extends("eslint:recommended", "prettier", "plugin:@typescript-eslint/recommended"),
 	{
+		// CommonJS build/tooling configs legitimately use module.exports/require.
+		files: ["*.config.js", "postcss.config.js", "tailwind.config.js", "forge.config.js"],
+		rules: {
+			"@typescript-eslint/no-require-imports": "off"
+		}
+	},
+	{
 		plugins: {
 			"@typescript-eslint": typescriptEslint
 		},
@@ -41,13 +48,18 @@ export default [
 		},
 
 		rules: {
-			"no-unused-vars": "warn",
+			// TypeScript handles undefined-symbol checking; the core rule only
+			// produces false positives for JSX/TS globals (React, AudioTrack…).
+			"no-undef": "off",
+			// Use the TS-aware unused-vars rule (the core one mis-flags type
+			// signature parameter names). Allow leading-underscore opt-outs.
+			"no-unused-vars": "off",
+			"@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
 			"no-console": "off",
-			"no-undef": "warn",
 			"no-constant-condition": "error",
-			indent: ["error", "tab"],
+			indent: ["error", "tab", { SwitchCase: 1 }],
 			semi: ["error", "always"],
-			quotes: [2, "double"],
+			quotes: ["error", "double", { avoidEscape: true }],
 			"prefer-const": "error",
 			"semi-style": ["error", "last"],
 			"no-process-exit": "off",

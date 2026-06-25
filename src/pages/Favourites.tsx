@@ -12,8 +12,7 @@ import NotFound from "../components/NotFound";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { favouritesService } from "../services/favouritesService";
 import type { FavouriteItem } from "../types";
-
-const placeholderPoster = "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png";
+import { PLACEHOLDER_POSTER } from "../constants";
 
 type FilterKey = "all" | "movie" | "series";
 
@@ -132,7 +131,7 @@ export default function Favourites() {
 								<Link
 									to={item.route}
 									style={{
-										backgroundImage: `url(${item.image || placeholderPoster})`,
+										backgroundImage: `url(${item.image || PLACEHOLDER_POSTER})`,
 										backgroundSize: "cover",
 										backgroundPosition: "center",
 										backgroundRepeat: "no-repeat",

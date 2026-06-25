@@ -94,17 +94,13 @@ function writeLog(level: LogLevel, scope: string, message: string, details?: Log
 	const line = `${prefix} ${message}`;
 	const hasPayload = Object.keys(payload).length > 0;
 
-	if (level === "error") {
-		hasPayload ? console.error(line, payload) : console.error(line);
-		return;
-	}
+	const sink = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
 
-	if (level === "warn") {
-		hasPayload ? console.warn(line, payload) : console.warn(line);
-		return;
+	if (hasPayload) {
+		sink(line, payload);
+	} else {
+		sink(line);
 	}
-
-	hasPayload ? console.log(line, payload) : console.log(line);
 }
 
 export function createLogger(scope: string) {

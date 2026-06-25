@@ -114,7 +114,7 @@ export default function LiveTv() {
 
 	const categorySwitcherItems = useMemo<GuideCategoryItem[]>(() =>
 		visibleCategories.map((cat) => ({ id: cat.category_id, name: cat.category_name })),
-		[visibleCategories]
+	[visibleCategories]
 	);
 
 	const channelSwitcherItems = useMemo<ChannelSwitcherItem[]>(() => {
@@ -188,13 +188,13 @@ export default function LiveTv() {
 											key={channel.stream_id}
 											to={to}
 											state={{
-											channels: channelSwitcherItems,
-											categories: categorySwitcherItems,
-											selectedCategoryId: selectedCategory?.category_id ?? "",
-											profileId: id,
-											backTo: `/menu/${id}/tv`,
-											backLabel: "Live TV"
-										}}
+												channels: channelSwitcherItems,
+												categories: categorySwitcherItems,
+												selectedCategoryId: selectedCategory?.category_id ?? "",
+												profileId: id,
+												backTo: `/menu/${id}/tv`,
+												backLabel: "Live TV"
+											}}
 											className="group flex min-h-[112px] items-center gap-4 rounded-xl border border-white/10 bg-primary/10 p-4 text-left text-secondary shadow-lg shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-secondary-400/10"
 										>
 											<div className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-dark/70">

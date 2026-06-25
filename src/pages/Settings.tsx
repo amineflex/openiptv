@@ -8,7 +8,6 @@ import {
 	EyeIcon,
 	EyeSlashIcon,
 	FilmIcon,
-	KeyIcon,
 	ServerStackIcon,
 	ShieldExclamationIcon
 } from "@heroicons/react/24/outline";
@@ -122,6 +121,12 @@ export default function Settings() {
 						<p className="mt-1 text-sm text-secondary-800">{stream.name}</p>
 					</div>
 					<div className="flex items-center gap-3">
+						{saveMessage && (
+							<span className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-400">
+								<CheckCircleIcon className="h-5 w-5" />
+								{saveMessage}
+							</span>
+						)}
 						<Link
 							to={`/menu/${id}`}
 							className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10"

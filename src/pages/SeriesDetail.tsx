@@ -6,13 +6,12 @@ import NotFound from "../components/NotFound";
 import StarRating from "../components/StarRating";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
-import { formatReleaseDate, getReleaseYear } from "../services/dateService";
+import { formatReleaseDate } from "../services/dateService";
 import { generateStreamUrl } from "../services/streamService";
 import { extractSubtitleTracks } from "../services/subtitleService";
 import { buildWatchRoute } from "../services/watchRoute";
 import type { SeriesEpisode, SeriesInfo, SubtitleTrack, WatchNextEpisode } from "../types";
-
-const placeholderPoster = "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png";
+import { PLACEHOLDER_POSTER } from "../constants";
 
 function getEpisodeTitle(episode: SeriesEpisode): string {
 	const prefix = episode.episode_num ? `Episode ${episode.episode_num}` : "Episode";
@@ -153,7 +152,6 @@ export default function SeriesDetail() {
 	const title = seriesInfo.info.name || "Series";
 	const releaseValue = seriesInfo.info.releaseDate || seriesInfo.info.releasedate;
 	const releaseDate = formatReleaseDate(releaseValue);
-	const releaseYear = getReleaseYear(releaseValue);
 	const favouriteItem = {
 		id: seriesId,
 		streamId: stream.id,
@@ -225,7 +223,7 @@ export default function SeriesDetail() {
 		<div className="relative min-h-screen bg-dark text-secondary">
 			<div className="absolute inset-x-0 top-0 h-[420px] overflow-hidden">
 				<img
-					src={seriesInfo.info.cover || placeholderPoster}
+					src={seriesInfo.info.cover || PLACEHOLDER_POSTER}
 					alt=""
 					className="h-full w-full scale-110 object-cover object-top opacity-35 blur-sm"
 				/>
@@ -247,7 +245,7 @@ export default function SeriesDetail() {
 			<main className="fade-in relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-12">
 				<header className="flex flex-col gap-8 md:flex-row md:items-end">
 					<img
-						src={seriesInfo.info.cover || placeholderPoster}
+						src={seriesInfo.info.cover || PLACEHOLDER_POSTER}
 						alt={title}
 						className="w-56 flex-none self-center rounded-2xl border border-white/10 object-cover shadow-2xl shadow-black/60 md:self-auto"
 					/>
@@ -344,7 +342,7 @@ export default function SeriesDetail() {
 								>
 									<div className="relative h-28 w-40 flex-none overflow-hidden rounded-lg bg-black">
 										<img
-											src={episode.info?.movie_image || seriesInfo.info?.cover || placeholderPoster}
+											src={episode.info?.movie_image || seriesInfo.info?.cover || PLACEHOLDER_POSTER}
 											alt={getEpisodeTitle(episode)}
 											loading="lazy"
 											className="h-full w-full object-cover transition duration-500 group-hover:scale-105"

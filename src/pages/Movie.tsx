@@ -11,8 +11,7 @@ import { generateStreamUrl } from "../services/streamService";
 import { extractSubtitleTracks } from "../services/subtitleService";
 import { buildWatchRoute } from "../services/watchRoute";
 import type { VodInfo } from "../types";
-
-const placeholderPoster = "https://popcornusa.s3.amazonaws.com/placeholder-movieimage.png";
+import { PLACEHOLDER_POSTER } from "../constants";
 
 export default function Movie() {
 	const { id, movieId } = useParams();
@@ -162,7 +161,7 @@ export default function Movie() {
 			<div className="fade-in relative z-10 mx-auto max-w-5xl px-6 pb-16 pt-20">
 				<div className="flex flex-col gap-8 md:flex-row md:items-end">
 					<img
-						src={movieInfo.info.cover_big || placeholderPoster}
+						src={movieInfo.info.cover_big || PLACEHOLDER_POSTER}
 						alt={movieName}
 						className="w-56 flex-none self-center rounded-2xl border border-white/10 shadow-2xl shadow-black/60 md:self-auto"
 					/>
