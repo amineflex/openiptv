@@ -92,10 +92,39 @@ export default function LivePlayer({
 	// ── Stream setup ──────────────────────────────────────────────────────────
 
 	useEffect(() => {
-		mpegtsRef.current = startStream(videoRef.current, streamUrl);
+		let cancelled = false;
+		let proxyId: string | null = null;
+
+		const openStream = async () => {
+			if (!streamUrl) {
+				mpegtsRef.current = startStream(videoRef.current, null);
+				return;
+			}
+
+			let playbackUrl = streamUrl;
+			if (window.openIptv?.createStreamProxy) {
+				const result = await window.openIptv.createStreamProxy(streamUrl);
+				if (cancelled) {
+					if (result?.ok && result.id) void window.openIptv?.releaseStreamProxy?.(result.id);
+					return;
+				}
+
+				if (result?.ok && result.url && result.id) {
+					proxyId = result.id;
+					playbackUrl = result.url;
+				}
+			}
+
+			if (cancelled) return;
+			mpegtsRef.current = startStream(videoRef.current, playbackUrl);
+		};
+
+		void openStream();
 		return () => {
+			cancelled = true;
 			mpegtsRef.current?.destroy();
 			mpegtsRef.current = null;
+			if (proxyId) void window.openIptv?.releaseStreamProxy?.(proxyId);
 		};
 	}, [streamUrl]);
 
@@ -642,6 +671,7 @@ export default function LivePlayer({
 			<StreamInfoPanel
 				open={isInfoOpen}
 				streamUrl={streamUrl}
+				videoRef={videoRef}
 				onClose={() => setIsInfoOpen(false)}
 			/>
 		</div>

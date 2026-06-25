@@ -7,3 +7,4 @@ dist-electron
 dist
 .agents
 .npm-cache
+CLAUDE.md

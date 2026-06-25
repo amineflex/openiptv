@@ -2,6 +2,7 @@ import {
 	ArrowLeftIcon,
 	ArrowsPointingOutIcon,
 	ChatBubbleBottomCenterTextIcon,
+	CheckIcon,
 	Cog6ToothIcon,
 	InformationCircleIcon,
 	PauseIcon,
@@ -44,6 +45,67 @@ function progressStyle(value: number, max = 100) {
 	};
 }
 
+const LANGUAGE_NAMES: Record<string, string> = {
+	ar: "Arabic",
+	ara: "Arabic",
+	de: "German",
+	deu: "German",
+	ger: "German",
+	en: "English",
+	eng: "English",
+	es: "Spanish",
+	spa: "Spanish",
+	fr: "French",
+	fra: "French",
+	fre: "French",
+	it: "Italian",
+	ita: "Italian",
+	nl: "Dutch",
+	dut: "Dutch",
+	nld: "Dutch",
+	pt: "Portuguese",
+	por: "Portuguese",
+	tr: "Turkish",
+	tur: "Turkish"
+};
+
+interface SubtitleUiOption {
+	id: string;
+	label: string;
+	language: string;
+	source: "external" | "embedded";
+}
+
+function formatSubtitleLanguage(language: string): string {
+	const code = language.trim().toLowerCase();
+	if (!code || code === "und") return "";
+	return LANGUAGE_NAMES[code] ?? code.toUpperCase();
+}
+
+function cleanSubtitleLabel(option: SubtitleUiOption): string {
+	const label = option.label
+		.replace(/\((?:subrip|srt|webvtt|vtt|ass|ssa|mov_text|text)\)/gi, "")
+		.replace(/^subtitle$/i, "")
+		.trim();
+	const language = formatSubtitleLanguage(option.language);
+	const code = option.language.trim().toLowerCase();
+
+	if (!label) return "";
+	if (label.toLowerCase() === language.toLowerCase()) return "";
+	if (code && label.toLowerCase() === code) return "";
+	return label;
+}
+
+function getSubtitleTitle(option: SubtitleUiOption, index: number): string {
+	const language = formatSubtitleLanguage(option.language);
+	const label = cleanSubtitleLabel(option);
+	return [language, label].filter(Boolean).join(" - ") || `Subtitle ${index + 1}`;
+}
+
+function getSubtitleMeta(option: SubtitleUiOption): string {
+	return option.source === "embedded" ? "Embedded track" : "Provider subtitle";
+}
+
 export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpisode, backTo, backLabel }: PlayerProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const navigate = useNavigate();
@@ -65,6 +127,7 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 		isFullscreen,
 		isMuted,
 		isPaused,
+		playbackRate,
 		selectedAudioIndex,
 		selectedSubtitleId,
 		subtitleError,
@@ -75,6 +138,7 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 		changeAudioTrack,
 		seekTo,
 		selectSubtitle,
+		setPlaybackRate,
 		setVolume,
 		toggleFullscreen,
 		toggleMute,
@@ -105,6 +169,12 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 		else navigate(-1);
 	};
 
+	const cyclePlaybackRate = () => {
+		const rates = [1, 1.5, 2, 0.5];
+		const currentIndex = rates.indexOf(playbackRate);
+		setPlaybackRate(rates[(currentIndex + 1) % rates.length]);
+	};
+
 	return (
 		<div
 			className="relative bg-black text-secondary min-h-screen flex items-center justify-center overflow-hidden"
@@ -116,13 +186,14 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 				onClick={togglePlay}
 				className="h-screen w-screen bg-black object-contain"
 			>
-				{subtitleTracks.map((track) => (
+				{subtitleTracks.filter((track) => track.id === selectedSubtitleId).map((track) => (
 					<track
-						key={track.id}
+						key={`${track.id}:${track.renderSrc}`}
 						kind="subtitles"
 						src={track.renderSrc}
 						srcLang={track.language}
 						label={track.label}
+						default
 					/>
 				))}
 			</video>
@@ -237,6 +308,19 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 						/>
 						<button
 							type="button"
+							onClick={cyclePlaybackRate}
+							title="Playback speed"
+							aria-label="Change playback speed"
+							className={`min-w-14 rounded-full px-3 py-2 text-sm font-bold transition-colors ${
+								playbackRate === 1
+									? "bg-white/10 text-secondary-700 hover:text-white"
+									: "bg-secondary-400 text-dark hover:bg-secondary"
+							}`}
+						>
+							x{playbackRate.toFixed(1)}
+						</button>
+						<button
+							type="button"
 							onClick={() => setIsSettingsOpen(true)}
 							className={`rounded-full p-2 hover:bg-white/10 ${selectedSubtitleId !== "off" ? "text-secondary-400" : "text-secondary-700 hover:text-white"}`}
 						>
@@ -267,13 +351,13 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 			<Dialog open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} className="relative z-[60]">
 				<div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
 				<div className="fixed inset-0 flex items-stretch justify-end">
-					<DialogPanel className="h-full w-full max-w-sm border-l border-white/10 bg-gray-950 p-6 text-white">
-						<DialogTitle className="mb-6 flex items-center text-xl font-bold">
+					<DialogPanel className="flex h-full w-full max-w-sm flex-col border-l border-white/10 bg-gray-950 text-white">
+						<DialogTitle className="flex shrink-0 items-center border-b border-white/10 px-6 py-5 text-xl font-bold">
 							<Cog6ToothIcon className="mr-2 h-6 w-6 text-secondary-400" />
 							Playback
 						</DialogTitle>
 
-						<div className="space-y-6">
+						<div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
 							<div>
 								<label className="mb-2 block text-xs font-bold uppercase text-gray-400">Audio Track</label>
 								{(() => {
@@ -315,18 +399,55 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 
 							<div>
 								<label className="mb-2 block text-xs font-bold uppercase text-gray-400">Subtitles</label>
-								<Select
-									value={selectedSubtitleId}
-									onChange={(event) => void selectSubtitle(event.target.value)}
-									className="block w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white focus:outline-none"
-								>
-									<option value="off" className="bg-gray-900">Off</option>
-									{subtitleOptions.map((track) => (
-										<option key={track.id} value={track.id} className="bg-gray-900">
-											{track.label}
-										</option>
-									))}
-								</Select>
+								<div className="max-h-[min(30rem,45vh)] space-y-2 overflow-y-auto pr-1">
+									<button
+										type="button"
+										onClick={() => void selectSubtitle("off")}
+										className={`flex w-full items-center justify-between rounded-lg border px-3.5 py-3 text-left transition ${
+											selectedSubtitleId === "off"
+												? "border-secondary-400 bg-secondary-400/15 text-white"
+												: "border-white/10 bg-white/5 text-secondary-800 hover:bg-white/10 hover:text-white"
+										}`}
+									>
+										<span>
+											<span className="block text-sm font-semibold">Off</span>
+											<span className="mt-0.5 block text-xs text-gray-500">No subtitle track</span>
+										</span>
+										{selectedSubtitleId === "off" && <CheckIcon className="h-5 w-5 text-secondary-400" />}
+									</button>
+
+									{subtitleOptions.map((track, index) => {
+										const selected = selectedSubtitleId === track.id;
+										const loading = subtitleLoadingId === track.id;
+										return (
+											<button
+												key={track.id}
+												type="button"
+												onClick={() => void selectSubtitle(track.id)}
+												className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3.5 py-3 text-left transition ${
+													selected
+														? "border-secondary-400 bg-secondary-400/15 text-white"
+														: "border-white/10 bg-white/5 text-secondary-800 hover:bg-white/10 hover:text-white"
+												}`}
+											>
+												<span className="min-w-0">
+													<span className="block truncate text-sm font-semibold">{getSubtitleTitle(track, index)}</span>
+													<span className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+														<span className="rounded bg-white/10 px-1.5 py-0.5 uppercase tracking-wide">
+															{track.source === "embedded" ? "Embedded" : "Provider"}
+														</span>
+														<span>{loading ? "Preparing..." : getSubtitleMeta(track)}</span>
+													</span>
+												</span>
+												{loading ? (
+													<span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-secondary-400 border-t-transparent" />
+												) : selected ? (
+													<CheckIcon className="h-5 w-5 shrink-0 text-secondary-400" />
+												) : null}
+											</button>
+										);
+									})}
+								</div>
 								{subtitleLoadingId && (
 									<p className="mt-2 text-sm text-secondary-400">Extracting subtitle track...</p>
 								)}
@@ -345,6 +466,7 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 			<StreamInfoPanel
 				open={isInfoOpen}
 				streamUrl={streamUrl}
+				videoRef={videoRef}
 				onClose={() => setIsInfoOpen(false)}
 			/>
 		</div>

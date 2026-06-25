@@ -1,8 +1,11 @@
 import type {
 	EmbeddedSubtitleExtractResult,
 	EmbeddedSubtitleListResult,
+	EmbeddedSubtitleWindowResult,
+	StreamProxyResult,
 	PlayableStreamResult,
-	StreamInfoResult
+	StreamInfoResult,
+	AppUsageStats
 } from "./types";
 
 declare global {
@@ -13,9 +16,20 @@ declare global {
 				streamUrl: string,
 				streamIndex: number
 			) => Promise<EmbeddedSubtitleExtractResult>;
+			extractEmbeddedSubtitleWindow: (
+				streamUrl: string,
+				streamIndex: number,
+				relativeIndex: number | undefined,
+				startSeconds: number,
+				durationSeconds: number
+			) => Promise<EmbeddedSubtitleWindowResult>;
 			resolvePlayableStream: (streamUrl: string) => Promise<PlayableStreamResult>;
+			createStreamProxy: (streamUrl: string) => Promise<StreamProxyResult>;
+			releaseStreamProxy: (proxyId: string) => Promise<{ ok: boolean }>;
 			probeStreamInfo: (streamUrl: string) => Promise<StreamInfoResult>;
 			stopTranscoding: () => Promise<{ ok: boolean }>;
+			getAppUsageStats: () => Promise<AppUsageStats>;
+			getSystemStats: () => Promise<AppUsageStats>;
 		};
 	}
 

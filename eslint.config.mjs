@@ -15,6 +15,14 @@ const compat = new FlatCompat({
 });
 
 export default [
+	{
+		ignores: [
+			"dist/**",
+			"dist-electron/**",
+			"out/**",
+			"node_modules/**"
+		]
+	},
 	...compat.extends("eslint:recommended", "prettier", "plugin:@typescript-eslint/recommended"),
 	{
 		plugins: {
@@ -23,16 +31,13 @@ export default [
 
 		languageOptions: {
 			globals: {
-				...globals.node
+				...globals.node,
+				...globals.browser
 			},
 
 			parser: tsParser,
 			ecmaVersion: "latest",
 			sourceType: "module"
-		},
-
-		env: {
-			browser: true
 		},
 
 		rules: {

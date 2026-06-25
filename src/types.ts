@@ -142,6 +142,7 @@ export interface SubtitleTrack {
 export interface EmbeddedSubtitleTrack {
 	id: string;
 	index: number;
+	relativeIndex?: number;
 	codec: string;
 	label: string;
 	language: string;
@@ -157,6 +158,11 @@ export interface EmbeddedSubtitleExtractResult {
 	ok: boolean;
 	vtt?: string;
 	error?: string;
+}
+
+export interface EmbeddedSubtitleWindowResult extends EmbeddedSubtitleExtractResult {
+	windowStart?: number;
+	windowDuration?: number;
 }
 
 export interface AudioStreamInfo {
@@ -176,6 +182,13 @@ export interface PlayableStreamResult {
 	transcodeBaseUrl?: string;
 	defaultAudioIndex?: number;
 	durationSeconds?: number;
+	error?: string;
+}
+
+export interface StreamProxyResult {
+	ok: boolean;
+	id?: string;
+	url: string;
 	error?: string;
 }
 
@@ -244,3 +257,22 @@ export interface StreamInfoResult {
 	format?: StreamProbeFormat;
 	error?: string;
 }
+
+export interface AppProcessUsage {
+	pid: number;
+	type: string;
+	cpuPercent: number;
+	ramMB: number;
+}
+
+export interface AppUsageStats {
+	cpuPercent: number;
+	ramMB: number;
+	networkKbps: number;
+	networkMB: number;
+	activeStreams: number;
+	gpuProcess?: AppProcessUsage;
+	processes: AppProcessUsage[];
+}
+
+export type SystemStats = AppUsageStats;

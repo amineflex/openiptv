@@ -1,12 +1,20 @@
 import { useEffect, useState } from "react";
+import type { RefObject } from "react";
 import { InformationCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import type { StreamInfoResult, StreamProbeStream } from "../types";
+import type { AppUsageStats, StreamInfoResult, StreamProbeStream } from "../types";
+
+interface VideoStats {
+	bufferSec: number;
+	decodedFrames: number;
+	droppedFrames: number;
+}
 
 interface Props {
 	open: boolean;
 	streamUrl: string | null;
 	onClose: () => void;
+	videoRef?: RefObject<HTMLVideoElement | null>;
 }
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
@@ -72,6 +80,22 @@ function formatChannels(ch?: number, layout?: string): string {
 	return `${ch} ch`;
 }
 
+function formatMB(mb: number): string {
+	if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+	return `${mb} MB`;
+}
+
+function formatKbps(kbps: number): string {
+	if (kbps >= 1000) return `${(kbps / 1000).toFixed(1)} Mbps`;
+	return `${Math.round(kbps)} Kbps`;
+}
+
+function barColor(percent: number): string {
+	if (percent >= 80) return "bg-red-500";
+	if (percent >= 60) return "bg-amber-400";
+	return "bg-secondary-400";
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function Row({ label, value }: { label: string; value?: string }) {
@@ -89,6 +113,17 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 		<h3 className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-secondary-700">
 			{children}
 		</h3>
+	);
+}
+
+function UsageBar({ percent, color }: { percent: number; color: string }) {
+	return (
+		<div className="h-1.5 rounded-full bg-white/10">
+			<div
+				className={`h-full rounded-full transition-all duration-700 ${color}`}
+				style={{ width: `${Math.min(100, percent)}%` }}
+			/>
+		</div>
 	);
 }
 
@@ -146,19 +181,74 @@ function SubtitleRow({ s }: { s: StreamProbeStream }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function StreamInfoPanel({ open, streamUrl, onClose }: Props) {
+export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: Props) {
 	const [info, setInfo] = useState<StreamInfoResult | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [appStats, setAppStats] = useState<AppUsageStats | null>(null);
+	const [videoStats, setVideoStats] = useState<VideoStats | null>(null);
 
+	// Probe stream info (static, once per open+url)
 	useEffect(() => {
 		if (!open || !streamUrl) return;
+		let cancelled = false;
 		setLoading(true);
 		setInfo(null);
 
 		window.openIptv?.probeStreamInfo(streamUrl)
-			.then((result) => { setInfo(result); setLoading(false); })
-			.catch(() => { setInfo({ ok: false, error: "Failed to probe stream" }); setLoading(false); });
+			.then((result) => { if (!cancelled) { setInfo(result); setLoading(false); } })
+			.catch(() => { if (!cancelled) { setInfo({ ok: false, error: "Failed to probe stream" }); setLoading(false); } });
+
+		return () => { cancelled = true; };
 	}, [open, streamUrl]);
+
+	// Poll live stats every second while panel is open
+	useEffect(() => {
+		if (!open) {
+			setAppStats(null);
+			setVideoStats(null);
+			return;
+		}
+
+		let active = true;
+
+		const tick = async () => {
+			const usage = await (
+				window.openIptv?.getAppUsageStats?.()
+				?? window.openIptv?.getSystemStats?.()
+			);
+			if (active && usage) setAppStats(usage);
+
+			// Video element stats
+			const video = videoRef?.current;
+			if (active && video) {
+				// Buffer ahead of playhead
+				let bufferSec = 0;
+				const { buffered, currentTime } = video;
+				for (let i = 0; i < buffered.length; i++) {
+					if (buffered.start(i) <= currentTime + 0.5 && buffered.end(i) > currentTime) {
+						bufferSec = Math.max(0, buffered.end(i) - currentTime);
+						break;
+					}
+				}
+
+				// Decoded / dropped frames
+				const quality = video.getVideoPlaybackQuality();
+
+				setVideoStats({
+					bufferSec,
+					decodedFrames: quality.totalVideoFrames,
+					droppedFrames: quality.droppedVideoFrames
+				});
+			}
+		};
+
+		void tick();
+		const id = setInterval(() => { void tick(); }, 1000);
+		return () => {
+			active = false;
+			clearInterval(id);
+		};
+	}, [open, videoRef]);
 
 	const videoStreams = (info?.streams ?? []).filter((s) => (s as StreamProbeStream).codec_type === "video") as StreamProbeStream[];
 	const audioStreams = (info?.streams ?? []).filter((s) => (s as StreamProbeStream).codec_type === "audio") as StreamProbeStream[];
@@ -187,6 +277,72 @@ export default function StreamInfoPanel({ open, streamUrl, onClose }: Props) {
 
 					{/* Body */}
 					<div className="flex-1 overflow-y-auto">
+
+						{/* ── Live Stats ───────────────────────────────── */}
+						<section className="border-b border-white/[0.07] px-5 py-4">
+							<SectionTitle>
+								<span className="flex items-center gap-2">
+									Application Usage
+									<span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+								</span>
+							</SectionTitle>
+
+							{!appStats ? (
+								<p className="text-xs text-gray-500">Collecting…</p>
+							) : (
+								<div className="space-y-3">
+									{/* CPU */}
+									<div>
+										<div className="mb-1.5 flex items-center justify-between text-xs">
+											<span className="text-gray-500">App CPU</span>
+											<span className="font-bold text-white">{appStats.cpuPercent}%</span>
+										</div>
+										<UsageBar percent={appStats.cpuPercent} color={barColor(appStats.cpuPercent)} />
+									</div>
+
+									{/* RAM */}
+									<Row label="App RAM" value={formatMB(appStats.ramMB)} />
+									<Row
+										label="Network"
+										value={`${formatKbps(appStats.networkKbps)}${appStats.networkMB > 0 ? ` / ${formatMB(appStats.networkMB)}` : ""}`}
+									/>
+									{appStats.activeStreams > 0 && (
+										<Row label="Active streams" value={String(appStats.activeStreams)} />
+									)}
+									{appStats.gpuProcess && (
+										<Row
+											label="GPU process"
+											value={`${appStats.gpuProcess.cpuPercent}% / ${formatMB(appStats.gpuProcess.ramMB)}`}
+										/>
+									)}
+
+									{/* Per-process breakdown */}
+									{appStats.processes.length > 1 && (
+										<div className="space-y-0.5 rounded-xl bg-primary/10 px-3 py-2">
+											{appStats.processes.map((p) => (
+												<div key={p.pid} className="flex items-baseline justify-between py-0.5">
+													<span className="text-xs text-gray-500">{p.type}</span>
+													<span className="text-xs text-gray-400">{p.cpuPercent}% · {formatMB(p.ramMB)}</span>
+												</div>
+											))}
+										</div>
+									)}
+
+									{/* Video element stats */}
+									{videoStats && (
+										<>
+											<Row label="Buffer" value={`${videoStats.bufferSec.toFixed(1)}s ahead`} />
+											<Row
+												label="Frames"
+												value={`${videoStats.decodedFrames.toLocaleString()} decoded${videoStats.droppedFrames > 0 ? ` · ${videoStats.droppedFrames} dropped` : ""}`}
+											/>
+										</>
+									)}
+								</div>
+							)}
+						</section>
+
+						{/* ── Stream probe ─────────────────────────────── */}
 						{loading && (
 							<div className="flex flex-col items-center justify-center gap-3 py-16">
 								<div className="h-8 w-8 animate-spin rounded-full border-2 border-secondary-400 border-t-transparent" />
