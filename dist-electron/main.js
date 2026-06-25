@@ -3,6 +3,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// ── Squirrel.Windows lifecycle ────────────────────────────────────────────────
+// Must be the very first executable code — Squirrel relaunches the exe with
+// --squirrel-* flags during install/update/uninstall. If we don't exit here,
+// a ghost window briefly appears during installation.
+const electron_squirrel_startup_1 = __importDefault(require("electron-squirrel-startup"));
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+if (electron_squirrel_startup_1.default) {
+    process.exit(0);
+}
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const fs_1 = require("fs");
@@ -67,34 +76,60 @@ function resolveBinary(name) {
     }
     return exe; // last-resort: let the OS try (will ENOENT if truly absent)
 }
-const FFMPEG = resolveBinary("ffmpeg");
-const FFPROBE = resolveBinary("ffprobe");
-const FFMPEG_AVAILABLE = path_1.default.isAbsolute(FFMPEG) && path_1.default.isAbsolute(FFPROBE);
+// ── ffmpeg / ffprobe resolution ────────────────────────────────────────────────
+// In production (packaged) builds we use the bundled ffmpeg-static / ffprobe-static
+// binaries, which are unpacked from the asar archive into app.asar.unpacked/ by
+// electron-forge (asarUnpack option in forge.config.js).
+// In development we fall back to the system PATH resolution defined above.
+function resolvePackagedBinaryPath(rawPath) {
+    // node_modules sit inside app.asar but binaries are unpacked into
+    // app.asar.unpacked — replace the asar root in the path accordingly.
+    return rawPath.replace(/(app\.asar)([/\\])/g, "$1.unpacked$2");
+}
+let FFMPEG;
+let FFPROBE;
+if (electron_1.app.isPackaged) {
+    // Production: use bundled static binaries
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ffmpegRaw = require("ffmpeg-static");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ffprobeRaw = require("ffprobe-static").path;
+    FFMPEG = resolvePackagedBinaryPath(ffmpegRaw);
+    FFPROBE = resolvePackagedBinaryPath(ffprobeRaw);
+}
+else {
+    // Development: search system PATH
+    FFMPEG = resolveBinary("ffmpeg");
+    FFPROBE = resolveBinary("ffprobe");
+}
+const FFMPEG_AVAILABLE = (0, fs_1.existsSync)(FFMPEG) && (0, fs_1.existsSync)(FFPROBE);
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const logger = (0, logger_1.createLogger)("electron-main");
-// Surface the resolved media binaries at startup. If either is just the bare
-// name (not an absolute path), it wasn't found anywhere — the usual cause of
-// "no audio / no subtitles" (ffmpeg not installed at all).
+// Surface the resolved media binaries at startup.
 if (FFMPEG_AVAILABLE) {
     logger.info("Resolved media binaries", {
         platform: process.platform,
         arch: process.arch,
         ffmpeg: FFMPEG,
-        ffprobe: FFPROBE
+        ffprobe: FFPROBE,
+        source: electron_1.app.isPackaged ? "bundled (ffmpeg-static)" : "system PATH"
     });
 }
 else {
     logger.error("ffmpeg/ffprobe NOT FOUND — audio transcoding & subtitles will fail", {
         platform: process.platform,
         arch: process.arch,
-        ffmpegFound: path_1.default.isAbsolute(FFMPEG),
-        ffprobeFound: path_1.default.isAbsolute(FFPROBE),
-        hint: process.platform === "darwin"
-            ? "Install with: brew install ffmpeg"
-            : process.platform === "linux"
-                ? "Install with your package manager, e.g. sudo apt install ffmpeg"
-                : "Install ffmpeg and ensure it is on PATH",
-        searchedDirs: SEARCH_DIRS
+        ffmpegPath: FFMPEG,
+        ffprobePath: FFPROBE,
+        source: electron_1.app.isPackaged ? "bundled (ffmpeg-static)" : "system PATH",
+        hint: electron_1.app.isPackaged
+            ? "Bundled binary not found — check asarUnpack config"
+            : process.platform === "darwin"
+                ? "Install with: brew install ffmpeg"
+                : process.platform === "linux"
+                    ? "Install with your package manager, e.g. sudo apt install ffmpeg"
+                    : "Install ffmpeg and ensure it is on PATH",
+        searchedDirs: electron_1.app.isPackaged ? [] : SEARCH_DIRS
     });
 }
 process.on("uncaughtException", (error) => {
@@ -152,10 +187,68 @@ function createWindow() {
         });
     }
 }
+// ── Auto-updater (Squirrel / macOS) ───────────────────────────────────────────
+// update-electron-app talks to update.electronjs.org which proxies GitHub
+// Releases into a Squirrel-compatible feed. Works only in packaged builds.
+function setupAutoUpdater() {
+    if (!electron_1.app.isPackaged)
+        return;
+    // update.electronjs.org serves the correct Squirrel feed URL for each platform.
+    const feedURL = `https://update.electronjs.org/amineflex/openiptv/${process.platform}-${process.arch}/${electron_1.app.getVersion()}`;
+    try {
+        electron_1.autoUpdater.setFeedURL({ url: feedURL });
+    }
+    catch (err) {
+        logger.error("Auto-updater setFeedURL failed", { error: String(err) });
+        return;
+    }
+    // Forward updater events to the renderer so the UI can react.
+    electron_1.autoUpdater.on("checking-for-update", () => {
+        logger.info("Auto-updater: checking for update");
+    });
+    electron_1.autoUpdater.on("update-available", () => {
+        logger.info("Auto-updater: update available — downloading");
+        const win = electron_1.BrowserWindow.getAllWindows()[0];
+        win?.webContents.send("updater:available");
+    });
+    electron_1.autoUpdater.on("update-not-available", () => {
+        logger.info("Auto-updater: app is up to date");
+    });
+    electron_1.autoUpdater.on("update-downloaded", (_event, releaseNotes, releaseName) => {
+        logger.info("Auto-updater: update downloaded", { releaseName });
+        const win = electron_1.BrowserWindow.getAllWindows()[0];
+        win?.webContents.send("updater:downloaded", { releaseName, releaseNotes });
+    });
+    electron_1.autoUpdater.on("error", (err) => {
+        logger.error("Auto-updater error", { error: err.message });
+    });
+    // Check on startup with a small delay to let the window finish loading.
+    setTimeout(() => {
+        try {
+            electron_1.autoUpdater.checkForUpdates();
+        }
+        catch (err) {
+            logger.error("Auto-updater checkForUpdates failed", { error: String(err) });
+        }
+    }, 8000);
+    // Then re-check every hour.
+    setInterval(() => {
+        try {
+            electron_1.autoUpdater.checkForUpdates();
+        }
+        catch { /* ignore */ }
+    }, 60 * 60 * 1000);
+}
+// IPC: renderer requests to quit and install the downloaded update.
+electron_1.ipcMain.handle("updater:quit-and-install", () => {
+    logger.info("Auto-updater: quit and install requested by renderer");
+    electron_1.autoUpdater.quitAndInstall();
+});
 electron_1.app.whenReady()
     .then(() => {
     logger.info("Electron app is ready");
     createWindow();
+    setupAutoUpdater();
     electron_1.app.on("activate", () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createWindow();

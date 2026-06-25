@@ -49,6 +49,25 @@ contextBridge.exposeInMainWorld("openIptv", {
 	getFfmpegStats: () =>
 		ipcRenderer.invoke("stats:get-ffmpeg"),
 
+	// ── Auto-updater ────────────────────────────────────────────────────────────
+	// Listen for update lifecycle events forwarded from the main process.
+	// Callbacks are registered once at mount; the returned cleanup function
+	// removes the listener (call it from useEffect's return value).
+	onUpdateAvailable: (cb: () => void) => {
+		const handler = () => cb();
+		ipcRenderer.on("updater:available", handler);
+		return () => ipcRenderer.removeListener("updater:available", handler);
+	},
+
+	onUpdateDownloaded: (cb: (info: { releaseName: string; releaseNotes?: string }) => void) => {
+		const handler = (_e: Electron.IpcRendererEvent, info: { releaseName: string; releaseNotes?: string }) => cb(info);
+		ipcRenderer.on("updater:downloaded", handler);
+		return () => ipcRenderer.removeListener("updater:downloaded", handler);
+	},
+
+	installUpdate: () =>
+		ipcRenderer.invoke("updater:quit-and-install"),
+
 	// Static — read once. process.platform/arch are available even in a
 	// sandboxed preload; Node builtins like "os" are NOT (they crash the
 	// whole preload and wipe out window.openIptv), so don't import them here.
@@ -57,3 +76,4 @@ contextBridge.exposeInMainWorld("openIptv", {
 		platform: process.platform
 	}
 });
+

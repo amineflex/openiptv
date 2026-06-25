@@ -34,6 +34,10 @@ declare global {
 			getAppUsageStats: () => Promise<AppUsageStats>;
 			getSystemStats: () => Promise<AppUsageStats>;
 			getFfmpegStats: () => Promise<FfmpegServerStats>;
+			// Auto-updater — returns a cleanup function to remove the listener
+			onUpdateAvailable: (cb: () => void) => () => void;
+			onUpdateDownloaded: (cb: (info: { releaseName: string; releaseNotes?: string }) => void) => () => void;
+			installUpdate: () => Promise<void>;
 			platformInfo: {
 				arch: string;
 				platform: string;
