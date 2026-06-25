@@ -1,3 +1,4 @@
+import os from "os";
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("openIptv", {
@@ -41,5 +42,12 @@ contextBridge.exposeInMainWorld("openIptv", {
 		ipcRenderer.invoke("stats:get-app-usage"),
 
 	getSystemStats: () =>
-		ipcRenderer.invoke("stats:get-system")
+		ipcRenderer.invoke("stats:get-system"),
+
+	// Static — read once, no IPC round-trip needed.
+	platformInfo: {
+		arch: process.arch,
+		platform: process.platform,
+		osRelease: os.release()
+	}
 });

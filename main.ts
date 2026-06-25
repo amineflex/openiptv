@@ -1,11 +1,48 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import path from "path";
+import { existsSync } from "fs";
 import { spawn } from "child_process";
 import http from "http";
 import https from "https";
 import type { IncomingHttpHeaders, ServerResponse } from "http";
 import { randomUUID } from "crypto";
 import { createLogger } from "./src/services/logger";
+
+// ── Binary resolution ─────────────────────────────────────────────────────────
+// Electron GUI apps on macOS do NOT inherit the user's shell PATH (Homebrew,
+// Nix, MacPorts…). We probe known installation dirs before falling back to PATH.
+const EXTRA_BINARY_DIRS: string[] = (() => {
+	switch (process.platform) {
+		case "darwin":
+			return [
+				"/opt/homebrew/bin",    // Homebrew – Apple Silicon (M1/M2/M3/M4)
+				"/usr/local/bin",       // Homebrew – Intel Macs + manual installs
+				"/opt/local/bin",       // MacPorts
+				"/usr/bin",
+			];
+		case "linux":
+			return ["/usr/bin", "/usr/local/bin", "/snap/bin"];
+		default:
+			return [];                  // Windows: PATH is inherited correctly
+	}
+})();
+
+function resolveBinary(name: string): string {
+	const exe = process.platform === "win32" ? `${name}.exe` : name;
+	for (const dir of EXTRA_BINARY_DIRS) {
+		const full = path.join(dir, exe);
+		if (existsSync(full)) return full;
+	}
+	for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+		if (!dir) continue;
+		const full = path.join(dir, exe);
+		if (existsSync(full)) return full;
+	}
+	return exe; // last-resort: let the OS try
+}
+
+const FFMPEG  = resolveBinary("ffmpeg");
+const FFPROBE = resolveBinary("ffprobe");
 
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const logger = createLogger("electron-main");
@@ -43,7 +80,12 @@ function createWindow() {
 		width: 1280,
 		height: 800,
 		autoHideMenuBar: true,
-		icon: path.join(__dirname, "../icon.ico"),
+		icon: (() => {
+			// .ico = Windows, .icns = macOS, .png = Linux
+			const ext = process.platform === "win32" ? "ico" : process.platform === "darwin" ? "icns" : "png";
+			const p = path.join(__dirname, `../icon.${ext}`);
+			return existsSync(p) ? p : undefined;
+		})(),
 		webPreferences: {
 			preload: path.join(__dirname, "preload.js"),
 			contextIsolation: true,
@@ -724,7 +766,7 @@ function packetsToVtt(packets: Array<{ pts_time?: string; duration_time?: string
 
 function probeAudioStreams(url: string): Promise<AudioProbeResult> {
 	return new Promise((resolve, reject) => {
-		const proc = spawn("ffprobe", [
+		const proc = spawn(FFPROBE, [
 			"-v", "quiet",
 			"-print_format", "json",
 			"-show_streams",
@@ -854,7 +896,7 @@ function ensureTranscodeServer(): Promise<number> {
 				"-f", "mpegts",
 				"pipe:1"
 			];
-			const proc = spawn("ffmpeg", args);
+			const proc = spawn(FFMPEG, args);
 			activeTranscodes.add(proc);
 
 			// Drain stderr: if nobody reads it, a full OS pipe buffer makes ffmpeg
@@ -989,7 +1031,7 @@ ipcMain.handle("subtitle:list-embedded", async (_event, rawUrl: unknown): Promis
 	}
 
 	return new Promise<ListResult>((resolve) => {
-		const proc = spawn("ffprobe", [
+		const proc = spawn(FFPROBE, [
 			"-v", "quiet",
 			"-print_format", "json",
 			"-show_streams",
@@ -1084,7 +1126,7 @@ ipcMain.handle(
 		const windowDuration = Math.max(15, Math.min(300, Number(durationSeconds) || 90));
 
 		return new Promise<ExtractWindowResult>((resolve) => {
-			const proc = spawn("ffprobe", [
+			const proc = spawn(FFPROBE, [
 				"-v", "error",
 				"-read_intervals", `${windowStart}%+${windowDuration}`,
 				"-select_streams", streamSpecifier,
@@ -1157,7 +1199,7 @@ ipcMain.handle("subtitle:extract-embedded", async (_event, rawUrl: unknown, inde
 	}
 
 	return new Promise<ExtractResult>((resolve) => {
-		const proc = spawn("ffmpeg", [
+		const proc = spawn(FFMPEG, [
 			"-hide_banner",
 			"-loglevel", "error",
 			"-i", url,
@@ -1280,7 +1322,7 @@ ipcMain.handle("media:probe-stream-info", (_event, rawUrl: unknown): Promise<Pro
 	}
 
 	return new Promise((resolve) => {
-		const proc = spawn("ffprobe", [
+		const proc = spawn(FFPROBE, [
 			"-v", "quiet",
 			"-print_format", "json",
 			"-show_streams",

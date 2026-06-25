@@ -80,6 +80,18 @@ function formatChannels(ch?: number, layout?: string): string {
 	return `${ch} ch`;
 }
 
+function formatArch(arch: string): string {
+	const map: Record<string, string> = {
+		x64: "x86-64", arm64: "ARM64", ia32: "x86", arm: "ARM", riscv64: "RISC-V 64"
+	};
+	return map[arch] ?? arch;
+}
+
+function formatPlatform(platform: string): string {
+	const map: Record<string, string> = { win32: "Windows", darwin: "macOS", linux: "Linux" };
+	return map[platform] ?? platform;
+}
+
 function formatMB(mb: number): string {
 	if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
 	return `${mb} MB`;
@@ -286,6 +298,17 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 									<span className="inline-block h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
 								</span>
 							</SectionTitle>
+
+							{(() => {
+								const p = window.openIptv?.platformInfo;
+								if (!p) return null;
+								return (
+									<Row
+										label="Device"
+										value={`${formatArch(p.arch)} ${formatPlatform(p.platform)}`}
+									/>
+								);
+							})()}
 
 							{!appStats ? (
 								<p className="text-xs text-gray-500">Collecting…</p>

@@ -784,7 +784,7 @@ export function useVideoPlayer(
 			return;
 		}
 
-		if (window.openIptv.extractEmbeddedSubtitleWindow) {
+		if (window.openIptv.extractEmbeddedSubtitleWindow !== undefined) {
 			await loadEmbeddedSubtitleWindow(embeddedTrack, currentTimeRef.current);
 			return;
 		}

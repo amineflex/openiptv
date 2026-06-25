@@ -30,6 +30,11 @@ declare global {
 			stopTranscoding: () => Promise<{ ok: boolean }>;
 			getAppUsageStats: () => Promise<AppUsageStats>;
 			getSystemStats: () => Promise<AppUsageStats>;
+			platformInfo: {
+				arch: string;
+				platform: string;
+				osRelease: string;
+			};
 		};
 	}
 
