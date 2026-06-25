@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { storageService } from "../services/storageService";
+import { historyService } from "../services/historyService";
 import type { IptvStream, StreamInput, StreamSettings } from "../types";
 
 type StreamField = keyof StreamInput;
@@ -97,6 +98,8 @@ export default function Settings() {
 			domain: stream.domain.trim(),
 			username: stream.username.trim()
 		});
+		// Trim existing history right away if the user lowered the cap.
+		historyService.applyLimit(id, stream.settings.maxHistoryItems);
 		setSaveMessage("Settings saved");
 		setTimeout(() => setSaveMessage(""), 3000);
 	};
@@ -246,6 +249,25 @@ export default function Settings() {
 											type="button"
 											onClick={() => updateSetting("maxVodPerPage", count)}
 											className={segmentBtn((stream.settings.maxVodPerPage ?? 50) === count)}
+										>
+											{count}
+										</button>
+									))}
+								</div>
+							</div>
+
+							<div>
+								<span className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-secondary-700">
+									<ClockIcon className="h-4 w-4" />
+									History size (recently watched)
+								</span>
+								<div className="grid grid-cols-4 gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+									{([10, 30, 50, 100] as const).map((count) => (
+										<button
+											key={count}
+											type="button"
+											onClick={() => updateSetting("maxHistoryItems", count)}
+											className={segmentBtn((stream.settings.maxHistoryItems ?? 30) === count)}
 										>
 											{count}
 										</button>

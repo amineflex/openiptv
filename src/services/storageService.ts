@@ -12,7 +12,8 @@ export const DEFAULT_SETTINGS: StreamSettings = {
 	adultChannel: false,
 	hourFormat: "24H",
 	maxChannelsPerCategory: 200,
-	maxVodPerPage: 50
+	maxVodPerPage: 50,
+	maxHistoryItems: 30
 };
 
 type StoredStream = Partial<IptvStream> & StreamInput;
@@ -124,6 +125,7 @@ export const storageService = {
 		localStorage.removeItem(scopedKey(id, STORAGE_KEYS.SELECTED_VOD_CATEGORY));
 		localStorage.removeItem(scopedKey(id, STORAGE_KEYS.SELECTED_SERIE_CATEGORY));
 		localStorage.removeItem(`favourites:${id}`);
+		localStorage.removeItem(`history:${id}`);
 		return true;
 	},
 

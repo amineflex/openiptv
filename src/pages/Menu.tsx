@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import {
 	ArrowLeftIcon,
 	ArrowRightIcon,
+	ClockIcon,
 	Cog6ToothIcon,
 	FilmIcon,
 	HeartIcon,
@@ -243,6 +244,21 @@ export default function Menu() {
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Favourites</p>
 									<p className="text-lg font-bold text-white 2xl:text-xl">Movies &amp; series</p>
+								</div>
+							</div>
+						</Link>
+
+						<Link
+							to="history"
+							className="group rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/15 to-transparent p-8 backdrop-blur transition hover:border-sky-400/50 hover:from-sky-400/25 focus:outline-none focus:ring-2 focus:ring-sky-400 2xl:p-6"
+						>
+							<div className="flex items-center gap-3">
+								<span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-sky-400/15 text-sky-300 transition group-hover:bg-sky-400 group-hover:text-dark 2xl:h-12 2xl:w-12">
+									<ClockIcon className="h-6 w-6 2xl:h-7 2xl:w-7" />
+								</span>
+								<div>
+									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">History</p>
+									<p className="text-lg font-bold text-white 2xl:text-xl">Recently watched</p>
 								</div>
 							</div>
 						</Link>

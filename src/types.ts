@@ -12,6 +12,8 @@ export interface StreamSettings {
 	hourFormat: HourFormat;
 	maxChannelsPerCategory: number;
 	maxVodPerPage: number;
+	// How many recently-watched entries to keep in the playback history.
+	maxHistoryItems: number;
 }
 
 export interface IptvStream {
@@ -219,6 +221,23 @@ export interface FavouriteItem {
 	subtitle?: string;
 	route: string;
 	addedAt: string;
+}
+
+export type HistoryType = "movie" | "series" | "live";
+
+export interface HistoryItem {
+	// Identity used for de-duplication: re-watching the same movie / series /
+	// channel moves its existing entry to the top instead of adding a duplicate.
+	key: string;
+	streamId: string;
+	type: HistoryType;
+	title: string;
+	image?: string;
+	subtitle?: string;
+	// Where clicking the entry navigates: the detail page for VOD (so it can be
+	// replayed with full context) or the /watch URL for live channels.
+	route: string;
+	watchedAt: string;
 }
 
 export interface WatchNextEpisode {

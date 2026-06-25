@@ -207,8 +207,24 @@ function createWindow() {
 function setupAutoUpdater(): void {
 	if (!app.isPackaged) return;
 
-	// update.electronjs.org serves the correct Squirrel feed URL for each platform.
-	const feedURL = `https://update.electronjs.org/amineflex/openiptv/${process.platform}-${process.arch}/${app.getVersion()}`;
+	// Electron's autoUpdater only implements Windows (Squirrel.Windows) and macOS
+	// (Squirrel.Mac). Linux has no autoUpdater — bail out before setFeedURL throws.
+	if (process.platform !== "win32" && process.platform !== "darwin") return;
+
+	const REPO = "amineflex/openiptv";
+
+	// Windows: point Squirrel straight at the GitHub Release assets. GitHub's
+	// `releases/latest/download/<asset>` always 302-redirects to the newest
+	// published (non-draft, non-prerelease) release's asset, so Squirrel fetches
+	// RELEASES and the referenced .nupkg with no extra hosting — and, crucially,
+	// this works for an UNSIGNED app (update.electronjs.org rejects unsigned ones).
+	// macOS: Squirrel.Mac needs a JSON feed AND a signed+notarized build;
+	// update.electronjs.org provides the feed, but without signing it won't apply.
+	const feedURL = process.platform === "win32"
+		? `https://github.com/${REPO}/releases/latest/download`
+		: `https://update.electronjs.org/${REPO}/${process.platform}-${process.arch}/${app.getVersion()}`;
+
+	logger.info("Auto-updater feed configured", { feedURL, version: app.getVersion() });
 
 	try {
 		autoUpdater.setFeedURL({ url: feedURL });
@@ -1142,7 +1158,17 @@ function ensureTranscodeServer(): Promise<number> {
 				args = [
 					"-hide_banner",
 					"-loglevel", "error",
-					"-fflags", "+genpts",
+					// +discardcorrupt: skip corrupt packets from a flaky IPTV server
+					// instead of aborting the whole transcode on the first bad byte.
+					"-fflags", "+genpts+discardcorrupt",
+					// Many IPTV VOD hosts drop or idle-close the connection mid-file.
+					// Without these the read errors out, ffmpeg exits, the stdout pipe
+					// closes and playback stalls/restarts ("pause à chaque fois"). Let
+					// ffmpeg silently re-open the HTTP source (and re-seek for byte-range
+					// inputs) so a transient drop never kills the pipe.
+					"-reconnect", "1",
+					"-reconnect_streamed", "1",
+					"-reconnect_delay_max", "5",
 					...(startTime > 0 ? ["-ss", startTime.toFixed(3)] : []),
 					"-i", sourceUrl,
 					...videoArgs,

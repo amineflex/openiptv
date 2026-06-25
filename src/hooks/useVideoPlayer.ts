@@ -604,6 +604,31 @@ export function useVideoPlayer(
 		const handlePause = () => setIsPaused(true);
 		const handleWaiting = () => setIsBuffering(true);
 		const handlePlaying = () => setIsBuffering(false);
+		// A transcoded stream that reaches "ended" well before the real duration
+		// means the ffmpeg pipe died early (an upstream drop the -reconnect flags
+		// couldn't ride out). Instead of leaving a dead player, transparently
+		// resume the transcode from where playback stopped — the user sees a short
+		// buffer instead of "pause à chaque fois". The 3 s throttle (shared with the
+		// timeupdate restart path) keeps a truly broken source from hot-looping.
+		const handleEnded = () => {
+			if (!isTranscodedStream || !resolvedStreamUrl) return;
+
+			const stableDuration = getStableDuration();
+			const playedTo = streamOffset + video.currentTime;
+			if (
+				stableDuration > 0
+				&& playedTo < stableDuration - 3
+				&& Date.now() - lastTranscodeRestartAtRef.current > 3000
+			) {
+				lastTranscodeRestartAtRef.current = Date.now();
+				setStreamOffset(playedTo);
+				setCurrentTime(playedTo);
+				currentTimeRef.current = playedTo;
+				lastLocalTimeRef.current = 0;
+				setIsBuffering(true);
+				setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, playedTo, selectedTranscodeAudioIndex, burnSubtitleIndexRef.current));
+			}
+		};
 
 		video.addEventListener("loadedmetadata", handleLoadedMetadata);
 		video.addEventListener("durationchange", handleDurationChange);
@@ -612,6 +637,7 @@ export function useVideoPlayer(
 		video.addEventListener("pause", handlePause);
 		video.addEventListener("waiting", handleWaiting);
 		video.addEventListener("playing", handlePlaying);
+		video.addEventListener("ended", handleEnded);
 		video.addEventListener("volumechange", syncVolume);
 		document.addEventListener("fullscreenchange", syncFullscreen);
 
@@ -623,6 +649,7 @@ export function useVideoPlayer(
 			video.removeEventListener("pause", handlePause);
 			video.removeEventListener("waiting", handleWaiting);
 			video.removeEventListener("playing", handlePlaying);
+			video.removeEventListener("ended", handleEnded);
 			video.removeEventListener("volumechange", syncVolume);
 			document.removeEventListener("fullscreenchange", syncFullscreen);
 			transcodePlayerRef.current?.destroy();
