@@ -47,6 +47,19 @@ const FFPROBE = resolveBinary("ffprobe");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const logger = createLogger("electron-main");
 
+// Surface the resolved media binaries at startup. If either is just the bare
+// name (not an absolute path), it wasn't found in any known dir or PATH — the
+// usual cause of "no audio / no subtitles" on macOS (ffmpeg not installed, or
+// the GUI app didn't inherit Homebrew's PATH).
+logger.info("Resolved media binaries", {
+	platform: process.platform,
+	arch: process.arch,
+	ffmpeg: FFMPEG,
+	ffmpegFound: path.isAbsolute(FFMPEG),
+	ffprobe: FFPROBE,
+	ffprobeFound: path.isAbsolute(FFPROBE)
+});
+
 process.on("uncaughtException", (error) => {
 	logger.exception("Uncaught exception", error);
 });

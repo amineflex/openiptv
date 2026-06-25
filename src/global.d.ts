@@ -33,7 +33,6 @@ declare global {
 			platformInfo: {
 				arch: string;
 				platform: string;
-				osRelease: string;
 			};
 		};
 	}

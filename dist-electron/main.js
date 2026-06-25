@@ -5,13 +5,62 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
+const fs_1 = require("fs");
 const child_process_1 = require("child_process");
 const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const crypto_1 = require("crypto");
 const logger_1 = require("./src/services/logger");
+// ── Binary resolution ─────────────────────────────────────────────────────────
+// Electron GUI apps on macOS do NOT inherit the user's shell PATH (Homebrew,
+// Nix, MacPorts…). We probe known installation dirs before falling back to PATH.
+const EXTRA_BINARY_DIRS = (() => {
+    switch (process.platform) {
+        case "darwin":
+            return [
+                "/opt/homebrew/bin", // Homebrew – Apple Silicon (M1/M2/M3/M4)
+                "/usr/local/bin", // Homebrew – Intel Macs + manual installs
+                "/opt/local/bin", // MacPorts
+                "/usr/bin",
+            ];
+        case "linux":
+            return ["/usr/bin", "/usr/local/bin", "/snap/bin"];
+        default:
+            return []; // Windows: PATH is inherited correctly
+    }
+})();
+function resolveBinary(name) {
+    const exe = process.platform === "win32" ? `${name}.exe` : name;
+    for (const dir of EXTRA_BINARY_DIRS) {
+        const full = path_1.default.join(dir, exe);
+        if ((0, fs_1.existsSync)(full))
+            return full;
+    }
+    for (const dir of (process.env.PATH ?? "").split(path_1.default.delimiter)) {
+        if (!dir)
+            continue;
+        const full = path_1.default.join(dir, exe);
+        if ((0, fs_1.existsSync)(full))
+            return full;
+    }
+    return exe; // last-resort: let the OS try
+}
+const FFMPEG = resolveBinary("ffmpeg");
+const FFPROBE = resolveBinary("ffprobe");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const logger = (0, logger_1.createLogger)("electron-main");
+// Surface the resolved media binaries at startup. If either is just the bare
+// name (not an absolute path), it wasn't found in any known dir or PATH — the
+// usual cause of "no audio / no subtitles" on macOS (ffmpeg not installed, or
+// the GUI app didn't inherit Homebrew's PATH).
+logger.info("Resolved media binaries", {
+    platform: process.platform,
+    arch: process.arch,
+    ffmpeg: FFMPEG,
+    ffmpegFound: path_1.default.isAbsolute(FFMPEG),
+    ffprobe: FFPROBE,
+    ffprobeFound: path_1.default.isAbsolute(FFPROBE)
+});
 process.on("uncaughtException", (error) => {
     logger.exception("Uncaught exception", error);
 });
@@ -39,7 +88,12 @@ function createWindow() {
         width: 1280,
         height: 800,
         autoHideMenuBar: true,
-        icon: path_1.default.join(__dirname, "../icon.ico"),
+        icon: (() => {
+            // .ico = Windows, .icns = macOS, .png = Linux
+            const ext = process.platform === "win32" ? "ico" : process.platform === "darwin" ? "icns" : "png";
+            const p = path_1.default.join(__dirname, `../icon.${ext}`);
+            return (0, fs_1.existsSync)(p) ? p : undefined;
+        })(),
         webPreferences: {
             preload: path_1.default.join(__dirname, "preload.js"),
             contextIsolation: true,
@@ -540,7 +594,7 @@ function packetsToVtt(packets) {
 }
 function probeAudioStreams(url) {
     return new Promise((resolve, reject) => {
-        const proc = (0, child_process_1.spawn)("ffprobe", [
+        const proc = (0, child_process_1.spawn)(FFPROBE, [
             "-v", "quiet",
             "-print_format", "json",
             "-show_streams",
@@ -661,7 +715,7 @@ function ensureTranscodeServer() {
                 "-f", "mpegts",
                 "pipe:1"
             ];
-            const proc = (0, child_process_1.spawn)("ffmpeg", args);
+            const proc = (0, child_process_1.spawn)(FFMPEG, args);
             activeTranscodes.add(proc);
             // Drain stderr: if nobody reads it, a full OS pipe buffer makes ffmpeg
             // block mid-write and freeze, which then ignores the dead stdout pipe.
@@ -787,7 +841,7 @@ electron_1.ipcMain.handle("subtitle:list-embedded", async (_event, rawUrl) => {
         return { ok: false, tracks: [], error: error instanceof Error ? error.message : "Invalid URL" };
     }
     return new Promise((resolve) => {
-        const proc = (0, child_process_1.spawn)("ffprobe", [
+        const proc = (0, child_process_1.spawn)(FFPROBE, [
             "-v", "quiet",
             "-print_format", "json",
             "-show_streams",
@@ -858,7 +912,7 @@ electron_1.ipcMain.handle("subtitle:extract-embedded-window", async (_event, raw
     const windowStart = Math.max(0, Number(startSeconds) || 0);
     const windowDuration = Math.max(15, Math.min(300, Number(durationSeconds) || 90));
     return new Promise((resolve) => {
-        const proc = (0, child_process_1.spawn)("ffprobe", [
+        const proc = (0, child_process_1.spawn)(FFPROBE, [
             "-v", "error",
             "-read_intervals", `${windowStart}%+${windowDuration}`,
             "-select_streams", streamSpecifier,
@@ -925,7 +979,7 @@ electron_1.ipcMain.handle("subtitle:extract-embedded", async (_event, rawUrl, in
         return { ok: false, error: "Invalid stream index" };
     }
     return new Promise((resolve) => {
-        const proc = (0, child_process_1.spawn)("ffmpeg", [
+        const proc = (0, child_process_1.spawn)(FFMPEG, [
             "-hide_banner",
             "-loglevel", "error",
             "-i", url,
@@ -1035,7 +1089,7 @@ electron_1.ipcMain.handle("media:probe-stream-info", (_event, rawUrl) => {
         return Promise.resolve({ ok: false, error: error instanceof Error ? error.message : "Invalid URL" });
     }
     return new Promise((resolve) => {
-        const proc = (0, child_process_1.spawn)("ffprobe", [
+        const proc = (0, child_process_1.spawn)(FFPROBE, [
             "-v", "quiet",
             "-print_format", "json",
             "-show_streams",

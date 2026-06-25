@@ -1,4 +1,3 @@
-import os from "os";
 import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("openIptv", {
@@ -44,10 +43,11 @@ contextBridge.exposeInMainWorld("openIptv", {
 	getSystemStats: () =>
 		ipcRenderer.invoke("stats:get-system"),
 
-	// Static — read once, no IPC round-trip needed.
+	// Static — read once. process.platform/arch are available even in a
+	// sandboxed preload; Node builtins like "os" are NOT (they crash the
+	// whole preload and wipe out window.openIptv), so don't import them here.
 	platformInfo: {
 		arch: process.arch,
-		platform: process.platform,
-		osRelease: os.release()
+		platform: process.platform
 	}
 });

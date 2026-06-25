@@ -206,7 +206,15 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 		setLoading(true);
 		setInfo(null);
 
-		window.openIptv?.probeStreamInfo(streamUrl)
+		// If the preload bridge failed to load, surface it instead of spinning forever.
+		const probe = window.openIptv?.probeStreamInfo;
+		if (!probe) {
+			setInfo({ ok: false, error: "Bridge unavailable (preload not loaded)" });
+			setLoading(false);
+			return;
+		}
+
+		probe(streamUrl)
 			.then((result) => { if (!cancelled) { setInfo(result); setLoading(false); } })
 			.catch(() => { if (!cancelled) { setInfo({ ok: false, error: "Failed to probe stream" }); setLoading(false); } });
 

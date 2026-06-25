@@ -11,5 +11,12 @@ electron_1.contextBridge.exposeInMainWorld("openIptv", {
     probeStreamInfo: (streamUrl) => electron_1.ipcRenderer.invoke("media:probe-stream-info", streamUrl),
     stopTranscoding: () => electron_1.ipcRenderer.invoke("media:stop-transcoding"),
     getAppUsageStats: () => electron_1.ipcRenderer.invoke("stats:get-app-usage"),
-    getSystemStats: () => electron_1.ipcRenderer.invoke("stats:get-system")
+    getSystemStats: () => electron_1.ipcRenderer.invoke("stats:get-system"),
+    // Static — read once. process.platform/arch are available even in a
+    // sandboxed preload; Node builtins like "os" are NOT (they crash the
+    // whole preload and wipe out window.openIptv), so don't import them here.
+    platformInfo: {
+        arch: process.arch,
+        platform: process.platform
+    }
 });
