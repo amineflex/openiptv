@@ -94,6 +94,7 @@ export default function LivePlayer({
 	useEffect(() => {
 		let cancelled = false;
 		let proxyId: string | null = null;
+		let transcodeActive = false;
 
 		const openStream = async () => {
 			if (!streamUrl) {
@@ -101,9 +102,24 @@ export default function LivePlayer({
 				return;
 			}
 
-			let playbackUrl = streamUrl;
-			if (window.openIptv?.createStreamProxy) {
-				const result = await window.openIptv.createStreamProxy(streamUrl);
+			// AC3/E-AC3/DTS live audio is undecodable by mpegts.js (silent channel).
+			// Ask the main process to resolve it: it transcodes just the audio to AAC
+			// (copying the video) and hands back a local MPEG-TS URL when needed.
+			let resolvedUrl = streamUrl;
+			if (window.openIptv?.resolveLiveStream) {
+				const resolved = await window.openIptv.resolveLiveStream(streamUrl);
+				if (cancelled) return;
+				if (resolved?.ok && resolved.url) {
+					resolvedUrl = resolved.url;
+					transcodeActive = resolved.transcoded;
+				}
+			}
+
+			// The transcode endpoint is already served from 127.0.0.1; only the raw
+			// upstream URL needs the CORS/redirect proxy that mpegts.js relies on.
+			let playbackUrl = resolvedUrl;
+			if (!transcodeActive && window.openIptv?.createStreamProxy) {
+				const result = await window.openIptv.createStreamProxy(resolvedUrl);
 				if (cancelled) {
 					if (result?.ok && result.id) void window.openIptv?.releaseStreamProxy?.(result.id);
 					return;
@@ -125,6 +141,9 @@ export default function LivePlayer({
 			mpegtsRef.current?.destroy();
 			mpegtsRef.current = null;
 			if (proxyId) void window.openIptv?.releaseStreamProxy?.(proxyId);
+			// Tear down any live audio transcode for the channel we're leaving so
+			// ffmpeg never lingers when zapping or backing out.
+			if (transcodeActive) void window.openIptv?.stopTranscoding?.();
 		};
 	}, [streamUrl]);
 
@@ -145,7 +164,7 @@ export default function LivePlayer({
 		const onPlaying = () => setIsBuffering(false);
 		const onVolumeChange = () => { setVolumeState(video.volume); setIsMuted(video.muted); };
 		const onFullscreenChange = () =>
-			setIsFullscreen(document.fullscreenElement === video.parentElement);
+			setIsFullscreen(Boolean(document.fullscreenElement));
 
 		video.addEventListener("waiting", onWaiting);
 		video.addEventListener("playing", onPlaying);
@@ -322,6 +341,35 @@ export default function LivePlayer({
 		return () => window.removeEventListener("keydown", handleKey);
 	}, [isChannelGuideOpen, limitedChannels]);
 
+	useEffect(() => {
+		const handleKey = (e: KeyboardEvent) => {
+			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+			const video = videoRef.current;
+
+			if (e.key === " " || e.code === "Space") {
+				e.preventDefault();
+				if (video) {
+					if (video.paused) void video.play();
+					else video.pause();
+				}
+				return;
+			}
+
+			if (isChannelGuideOpen) return;
+
+			if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+				e.preventDefault();
+				if (video) {
+					const next = Math.max(0, Math.min(1, video.volume + (e.key === "ArrowUp" ? 0.1 : -0.1)));
+					video.volume = next;
+					video.muted = next === 0;
+				}
+			}
+		};
+		window.addEventListener("keydown", handleKey);
+		return () => window.removeEventListener("keydown", handleKey);
+	}, [isChannelGuideOpen]);
+
 	// ── Video controls ────────────────────────────────────────────────────────
 
 	const toggleMute = () => {
@@ -338,10 +386,11 @@ export default function LivePlayer({
 	};
 
 	const toggleFullscreen = () => {
-		const container = videoRef.current?.parentElement;
-		if (!container) return;
+		// Fullscreen the whole document so the settings / channel-guide dialogs
+		// (Headless UI portals to <body>) stay inside the fullscreen top layer and
+		// remain visible and clickable.
 		if (document.fullscreenElement) void document.exitFullscreen();
-		else void container.requestFullscreen();
+		else void document.documentElement.requestFullscreen();
 	};
 
 	const changeAudioTrack = (index: number) => {

@@ -18,6 +18,8 @@ export interface SubtitleOption {
 	label: string;
 	language: string;
 	source: "external" | "embedded";
+	// Image-based embedded track that will be burned into the video on selection.
+	bitmap?: boolean;
 }
 
 // Matches a cue timing line in either "HH:MM:SS.mmm" or "MM:SS.mmm" form
@@ -180,10 +182,20 @@ async function prepareSubtitleTrack(
 	}
 }
 
-function buildSeekableTranscodeUrl(url: string, startTime: number, audioIndex = 0): string {
+function buildSeekableTranscodeUrl(
+	url: string,
+	startTime: number,
+	audioIndex = 0,
+	burnSubtitleIndex: number | null = null
+): string {
 	const nextUrl = new URL(url);
 	nextUrl.searchParams.set("start", Math.max(0, startTime).toFixed(3));
 	nextUrl.searchParams.set("audio", String(audioIndex));
+	if (burnSubtitleIndex !== null && burnSubtitleIndex >= 0) {
+		nextUrl.searchParams.set("subtitle", String(burnSubtitleIndex));
+	} else {
+		nextUrl.searchParams.delete("subtitle");
+	}
 	return nextUrl.toString();
 }
 
@@ -208,6 +220,12 @@ export function useVideoPlayer(
 	const [subtitleError, setSubtitleError] = useState<string | null>(null);
 	const [playableStreamUrl, setPlayableStreamUrl] = useState<string | null>(null);
 	const [resolvedStreamUrl, setResolvedStreamUrl] = useState<string | null>(null);
+	// Transcode base URL kept around even for natively-played streams, so a
+	// bitmap subtitle can be burned in on demand by switching to a re-encode.
+	const [transcodeBaseUrl, setTranscodeBaseUrl] = useState<string | null>(null);
+	// Subtitle-relative index (ffmpeg 0:s:N) currently burned into the picture,
+	// or null when no bitmap subtitle is active.
+	const [burnSubtitleIndex, setBurnSubtitleIndex] = useState<number | null>(null);
 	const [durationOverride, setDurationOverride] = useState<number | null>(null);
 	const [isTranscodedStream, setIsTranscodedStream] = useState(false);
 	const [streamOffset, setStreamOffset] = useState(0);
@@ -219,6 +237,7 @@ export function useVideoPlayer(
 	const [playbackRate, setPlaybackRateState] = useState(1);
 	const [isBuffering, setIsBuffering] = useState(false);
 	const [isFullscreen, setIsFullscreen] = useState(false);
+	const [requiresMpegTsPlayer, setRequiresMpegTsPlayer] = useState(false);
 
 	// Ref-tracked currentTime so the keyboard seek handler doesn't re-register on every tick.
 	const currentTimeRef = useRef(0);
@@ -232,6 +251,11 @@ export function useVideoPlayer(
 	const lastLocalTimeRef = useRef(0);
 	const lastTranscodeRestartAtRef = useRef(0);
 	const transcodePlayerRef = useRef<mpegts.Player | null>(null);
+	const playbackRateRef = useRef(1);
+	const transcodeBaseUrlRef = useRef<string | null>(null);
+	const resolvedStreamUrlRef = useRef<string | null>(null);
+	const selectedTranscodeAudioIndexRef = useRef(0);
+	const burnSubtitleIndexRef = useRef<number | null>(null);
 
 	const releaseCurrentStreamProxy = useCallback(() => {
 		const proxyId = streamProxyIdRef.current;
@@ -272,7 +296,8 @@ export function useVideoPlayer(
 				id: track.id,
 				label: `${track.label}${track.codec ? ` (${track.codec})` : ""}`,
 				language: track.language,
-				source: "embedded"
+				source: "embedded" as const,
+				bitmap: track.bitmap
 			}));
 
 		return [...external, ...embedded];
@@ -291,6 +316,23 @@ export function useVideoPlayer(
 	}, [subtitleTracks]);
 
 	useEffect(() => {
+		transcodeBaseUrlRef.current = transcodeBaseUrl;
+	}, [transcodeBaseUrl]);
+
+	useEffect(() => {
+		resolvedStreamUrlRef.current = resolvedStreamUrl;
+	}, [resolvedStreamUrl]);
+
+	useEffect(() => {
+		selectedTranscodeAudioIndexRef.current = selectedTranscodeAudioIndex;
+	}, [selectedTranscodeAudioIndex]);
+
+	useEffect(() => {
+		burnSubtitleIndexRef.current = burnSubtitleIndex;
+	}, [burnSubtitleIndex]);
+
+	useEffect(() => {
+		playbackRateRef.current = playbackRate;
 		const video = videoRef.current;
 		if (!video) return;
 		video.playbackRate = playbackRate;
@@ -333,8 +375,11 @@ export function useVideoPlayer(
 		if (!streamUrl) {
 			setPlayableStreamUrl(null);
 			setResolvedStreamUrl(null);
+			setTranscodeBaseUrl(null);
+			setBurnSubtitleIndex(null);
 			setDurationOverride(null);
 			setIsTranscodedStream(false);
+			setRequiresMpegTsPlayer(false);
 			setStreamOffset(0);
 			setCurrentTime(0);
 			setProbeAudioTracks([]);
@@ -353,6 +398,8 @@ export function useVideoPlayer(
 				streamProxyIdRef.current = playback.proxyId;
 				setPlayableStreamUrl(playback.url);
 				setResolvedStreamUrl(playback.url);
+				setTranscodeBaseUrl(null);
+				setBurnSubtitleIndex(null);
 				setDurationOverride(null);
 				setIsTranscodedStream(false);
 				setStreamOffset(0);
@@ -370,8 +417,11 @@ export function useVideoPlayer(
 
 		setPlayableStreamUrl(null);
 		setResolvedStreamUrl(null);
+		setTranscodeBaseUrl(null);
+		setBurnSubtitleIndex(null);
 		setDurationOverride(null);
 		setIsTranscodedStream(false);
+		setRequiresMpegTsPlayer(false);
 		setStreamOffset(0);
 		setCurrentTime(0);
 		setProbeAudioTracks([]);
@@ -401,7 +451,10 @@ export function useVideoPlayer(
 				setSelectedTranscodeAudioIndex(defaultAudioIdx);
 				if (defaultAudioIdx !== 0) setSelectedAudioIndex(defaultAudioIdx);
 				setResolvedStreamUrl(nextUrl);
+				setTranscodeBaseUrl(result?.transcodeBaseUrl ?? null);
+				setBurnSubtitleIndex(null);
 				setIsTranscodedStream(shouldUseTranscodeSeek);
+				setRequiresMpegTsPlayer(!shouldUseTranscodeSeek && (result?.requiresMpegTsPlayer ?? false));
 				setPlayableStreamUrl(
 					shouldUseTranscodeSeek
 						? buildSeekableTranscodeUrl(playback.url, 0, defaultAudioIdx)
@@ -423,8 +476,11 @@ export function useVideoPlayer(
 					streamProxyIdRef.current = playback.proxyId;
 					setPlayableStreamUrl(playback.url);
 					setResolvedStreamUrl(playback.url);
+					setTranscodeBaseUrl(null);
+					setBurnSubtitleIndex(null);
 					setDurationOverride(null);
 					setIsTranscodedStream(false);
+					setRequiresMpegTsPlayer(false);
 				}
 			} finally {
 				if (!cancelled) setIsBuffering(false);
@@ -452,14 +508,29 @@ export function useVideoPlayer(
 		transcodePlayerRef.current?.destroy();
 		transcodePlayerRef.current = null;
 
-		if (isTranscodedStream && mpegts.isSupported()) {
+		if ((isTranscodedStream || requiresMpegTsPlayer) && mpegts.isSupported()) {
 			const player = mpegts.createPlayer({
 				type: "mpegts",
 				isLive: false,
 				url: playableStreamUrl
 			}, {
 				enableWorker: true,
+				// Keep pulling from the local ffmpeg pipe continuously instead of
+				// suspending the connection when the buffer looks "full" — we want
+				// to build the deepest lead the transcoder can give us.
 				lazyLoad: false,
+				// Hold a bigger IO stash so a transient producer hiccup (the CPU
+				// spike from the parallel subtitle ffmpeg, or the buffer draining
+				// twice as fast at 2× speed) doesn't immediately starve the demuxer
+				// and trip a stall. Default is 64 KiB.
+				enableStashBuffer: true,
+				stashInitialSize: 1024 * 1024,
+				// Trim already-played media so a long movie's SourceBuffer can't grow
+				// unbounded and cause GC hitches mid-playback, while keeping a roomy
+				// backward window so short rewinds stay instant.
+				autoCleanupSourceBuffer: true,
+				autoCleanupMaxBackwardDuration: 120,
+				autoCleanupMinBackwardDuration: 90,
 				reuseRedirectedURL: true
 			});
 
@@ -493,7 +564,7 @@ export function useVideoPlayer(
 		};
 
 		const syncFullscreen = () => {
-			setIsFullscreen(document.fullscreenElement === video.parentElement);
+			setIsFullscreen(Boolean(document.fullscreenElement));
 		};
 
 		const handleLoadedMetadata = () => {
@@ -519,7 +590,7 @@ export function useVideoPlayer(
 				currentTimeRef.current = resumeTime;
 				setIsBuffering(true);
 				lastTranscodeRestartAtRef.current = Date.now();
-				setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, resumeTime, selectedTranscodeAudioIndex));
+				setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, resumeTime, selectedTranscodeAudioIndex, burnSubtitleIndexRef.current));
 				return;
 			}
 
@@ -560,13 +631,14 @@ export function useVideoPlayer(
 			video.removeAttribute("src");
 			video.load();
 		};
-	}, [durationOverride, isTranscodedStream, playableStreamUrl, resolvedStreamUrl, selectedTranscodeAudioIndex, streamOffset, type, videoRef]);
+	}, [durationOverride, isTranscodedStream, playableStreamUrl, requiresMpegTsPlayer, resolvedStreamUrl, selectedTranscodeAudioIndex, streamOffset, type, videoRef]);
 
 	// Reset prepared subtitle payloads when moving to another media item.
 	useEffect(() => {
 		subtitleLoadControllerRef.current?.abort();
 		subtitleLoadControllerRef.current = null;
 		selectedSubtitleIdRef.current = "off";
+		burnSubtitleIndexRef.current = null;
 		setSelectedSubtitleId("off");
 		setSubtitleError(null);
 		setSubtitleLoadingId(null);
@@ -649,6 +721,12 @@ export function useVideoPlayer(
 	) => {
 		if (!streamUrl || !window.openIptv?.extractEmbeddedSubtitleWindow) return false;
 
+		// At higher playback rates the window of media drains proportionally
+		// faster, so extract a proportionally wider window to keep the wall-clock
+		// re-extraction cadence (and thus the competing ffmpeg spawns) roughly
+		// constant instead of doubling at 2×. The main process clamps to 300s.
+		const rate = Math.max(1, playbackRateRef.current);
+		const windowSeconds = Math.min(300, Math.round(EMBEDDED_SUBTITLE_WINDOW_SECONDS * rate));
 		const windowStart = Math.max(0, Math.floor(positionSeconds - EMBEDDED_SUBTITLE_BACKTRACK_SECONDS));
 		const requestKey = { id: embeddedTrack.id, start: windowStart };
 		embeddedWindowLoadRef.current = requestKey;
@@ -660,7 +738,7 @@ export function useVideoPlayer(
 				embeddedTrack.index,
 				embeddedTrack.relativeIndex,
 				windowStart,
-				EMBEDDED_SUBTITLE_WINDOW_SECONDS
+				windowSeconds
 			);
 			if (
 				embeddedWindowLoadRef.current?.id !== requestKey.id
@@ -679,7 +757,7 @@ export function useVideoPlayer(
 			const renderOffset = subtitleRenderOffsetRef.current;
 			const renderSrc = createSubtitleRenderSrc(normalizedVtt, renderOffset);
 			const nextWindowStart = result.windowStart ?? windowStart;
-			const nextWindowEnd = nextWindowStart + (result.windowDuration ?? EMBEDDED_SUBTITLE_WINDOW_SECONDS);
+			const nextWindowEnd = nextWindowStart + (result.windowDuration ?? windowSeconds);
 
 			const renderedTrack: PlayerSubtitleTrack = {
 				id: embeddedTrack.id,
@@ -720,11 +798,84 @@ export function useVideoPlayer(
 		}
 	}, [streamUrl]);
 
+	// Switch into a transcoded re-encode that burns the given bitmap subtitle
+	// (PGS/DVD/DVB) into the picture — the only way to show image subtitles in a
+	// <video>. Promotes even a natively-played stream into transcoded mode,
+	// preserving the current position.
+	const applyBurnInSubtitle = useCallback((relativeIndex: number): boolean => {
+		const base = transcodeBaseUrlRef.current;
+		if (!base) {
+			setSubtitleError("Burn-in subtitles aren't available for this stream");
+			return false;
+		}
+
+		const resumeTime = currentTimeRef.current;
+		burnSubtitleIndexRef.current = relativeIndex;
+		setBurnSubtitleIndex(relativeIndex);
+		setIsTranscodedStream(true);
+		setResolvedStreamUrl(base);
+		resolvedStreamUrlRef.current = base;
+		setStreamOffset(resumeTime);
+		setCurrentTime(resumeTime);
+		currentTimeRef.current = resumeTime;
+		lastLocalTimeRef.current = 0;
+		lastTranscodeRestartAtRef.current = Date.now();
+		setIsBuffering(true);
+		setPlayableStreamUrl(buildSeekableTranscodeUrl(base, resumeTime, selectedTranscodeAudioIndexRef.current, relativeIndex));
+		return true;
+	}, []);
+
+	// Drop the burned overlay but stay on the transcoded stream — we can't cleanly
+	// fall back to native playback mid-movie, so just rebuild the re-encode without
+	// the subtitle at the current position.
+	const clearBurnInSubtitle = useCallback(() => {
+		if (burnSubtitleIndexRef.current === null) return;
+		const base = resolvedStreamUrlRef.current ?? transcodeBaseUrlRef.current;
+		burnSubtitleIndexRef.current = null;
+		setBurnSubtitleIndex(null);
+		if (!base) return;
+
+		const resumeTime = currentTimeRef.current;
+		setStreamOffset(resumeTime);
+		setCurrentTime(resumeTime);
+		currentTimeRef.current = resumeTime;
+		lastLocalTimeRef.current = 0;
+		lastTranscodeRestartAtRef.current = Date.now();
+		setIsBuffering(true);
+		setPlayableStreamUrl(buildSeekableTranscodeUrl(base, resumeTime, selectedTranscodeAudioIndexRef.current, null));
+	}, []);
+
 	const selectSubtitle = useCallback(async (id: string) => {
 		setSubtitleError(null);
 		subtitleLoadControllerRef.current?.abort();
 		subtitleLoadControllerRef.current = null;
 		selectedSubtitleIdRef.current = id;
+
+		// Bitmap (PGS/DVD/DVB) embedded subtitles can't become a WebVTT <track>;
+		// burn them into the video instead.
+		const targetEmbedded = embeddedSubtitleTracks.find((track) => track.id === id);
+		if (targetEmbedded?.bitmap) {
+			if (targetEmbedded.relativeIndex === undefined) {
+				setSubtitleError("This subtitle track can't be burned in");
+				return;
+			}
+			// Re-selecting the already-burned track is a no-op (avoid a restart).
+			if (burnSubtitleIndexRef.current === targetEmbedded.relativeIndex) {
+				setSelectedSubtitleId(id);
+				return;
+			}
+			setSubtitleLoadingId(null);
+			if (applyBurnInSubtitle(targetEmbedded.relativeIndex)) {
+				setSelectedSubtitleId(id);
+			}
+			return;
+		}
+
+		// Switching away from a burned subtitle to anything else: tear the overlay
+		// down first (rebuilds the transcode without it, still transcoded).
+		if (burnSubtitleIndexRef.current !== null) {
+			clearBurnInSubtitle();
+		}
 
 		if (id === "off") {
 			setSubtitleLoadingId(null);
@@ -836,26 +987,30 @@ export function useVideoPlayer(
 		} finally {
 			if (selectedSubtitleIdRef.current === id) setSubtitleLoadingId(null);
 		}
-	}, [embeddedSubtitleTracks, loadEmbeddedSubtitleWindow, streamUrl, subtitleTracks, subtitles]);
+	}, [applyBurnInSubtitle, clearBurnInSubtitle, embeddedSubtitleTracks, loadEmbeddedSubtitleWindow, streamUrl, subtitleTracks, subtitles]);
 
 	useEffect(() => {
 		if (selectedSubtitleId === "off") return;
 		if (!window.openIptv?.extractEmbeddedSubtitleWindow) return;
 
 		const embeddedTrack = embeddedSubtitleTracks.find((track) => track.id === selectedSubtitleId);
-		if (!embeddedTrack) return;
+		if (!embeddedTrack || embeddedTrack.bitmap) return;
 
 		const preparedTrack = subtitleTracks.find((track) => track.id === selectedSubtitleId);
 		if (!preparedTrack?.windowEnd) return;
 
+		// Start the (heavy) re-extraction further ahead when sped up, so the new
+		// window is ready before the playhead reaches it instead of being kicked
+		// off in a panic mid-stall.
+		const lookahead = EMBEDDED_SUBTITLE_LOOKAHEAD_SECONDS * Math.max(1, playbackRate);
 		const shouldRefresh =
 			currentTime < (preparedTrack.windowStart ?? 0)
-			|| currentTime >= preparedTrack.windowEnd - EMBEDDED_SUBTITLE_LOOKAHEAD_SECONDS;
+			|| currentTime >= preparedTrack.windowEnd - lookahead;
 		if (!shouldRefresh) return;
 		if (embeddedWindowLoadRef.current?.id === selectedSubtitleId) return;
 
 		void loadEmbeddedSubtitleWindow(embeddedTrack, currentTime);
-	}, [currentTime, embeddedSubtitleTracks, loadEmbeddedSubtitleWindow, selectedSubtitleId, subtitleTracks]);
+	}, [currentTime, embeddedSubtitleTracks, loadEmbeddedSubtitleWindow, playbackRate, selectedSubtitleId, subtitleTracks]);
 
 	const togglePlay = useCallback(() => {
 		const video = videoRef.current;
@@ -868,6 +1023,28 @@ export function useVideoPlayer(
 		}
 	}, [videoRef]);
 
+	// Force-repaint subtitle rendering. Chromium can leave the last active cue
+	// "stuck" on screen after a seek (it never receives its exit event, and our
+	// windowed embedded track only reloads once the new position has buffered).
+	// Toggle the showing track off, then re-enable it on the next frame so the
+	// overlay is repainted from the cues that are actually active now.
+	const clearRenderedCues = useCallback(() => {
+		const video = videoRef.current;
+		if (!video) return;
+
+		const tracks = video.textTracks;
+		for (let i = 0; i < tracks.length; i++) {
+			const track = tracks[i];
+			if (track.mode !== "showing") continue;
+			track.mode = "disabled";
+			requestAnimationFrame(() => {
+				if (selectedSubtitleIdRef.current !== "off" && track.mode === "disabled") {
+					track.mode = "showing";
+				}
+			});
+		}
+	}, [videoRef]);
+
 	const seekTo = useCallback((time: number) => {
 		const video = videoRef.current;
 		if (!video || !Number.isFinite(time)) return;
@@ -877,6 +1054,8 @@ export function useVideoPlayer(
 			: video.duration > 0 ? video.duration : time;
 		const nextTime = Math.max(0, Math.min(time, maxTime));
 
+		clearRenderedCues();
+
 		if (isTranscodedStream && resolvedStreamUrl) {
 			setStreamOffset(nextTime);
 			setCurrentTime(nextTime);
@@ -884,13 +1063,13 @@ export function useVideoPlayer(
 			setIsBuffering(true);
 			lastLocalTimeRef.current = 0;
 			lastTranscodeRestartAtRef.current = Date.now();
-			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, nextTime, selectedTranscodeAudioIndex));
+			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, nextTime, selectedTranscodeAudioIndex, burnSubtitleIndexRef.current));
 			return;
 		}
 
 		video.currentTime = nextTime;
 		setCurrentTime(video.currentTime);
-	}, [durationOverride, isTranscodedStream, resolvedStreamUrl, selectedTranscodeAudioIndex, videoRef]);
+	}, [clearRenderedCues, durationOverride, isTranscodedStream, resolvedStreamUrl, selectedTranscodeAudioIndex, videoRef]);
 
 	const setVolume = useCallback((value: number) => {
 		const video = videoRef.current;
@@ -918,15 +1097,17 @@ export function useVideoPlayer(
 	}, [videoRef]);
 
 	const toggleFullscreen = useCallback(() => {
-		const container = videoRef.current?.parentElement;
-		if (!container) return;
-
+		// Fullscreen the whole document, not just the video container: the subtitle
+		// settings and stream-info panels are Headless UI dialogs that portal to
+		// <body>. If only the container were fullscreen they'd render outside the
+		// top layer and be invisible/unclickable. <body> is inside <html>, so they
+		// stay interactive this way.
 		if (document.fullscreenElement) {
 			void document.exitFullscreen();
 		} else {
-			void container.requestFullscreen();
+			void document.documentElement.requestFullscreen();
 		}
-	}, [videoRef]);
+	}, []);
 
 	const changeAudioTrack = useCallback((relativeIndex: number) => {
 		// Transcoded stream: rebuild URL with new audio track index and current position.
@@ -938,7 +1119,7 @@ export function useVideoPlayer(
 			currentTimeRef.current = currentTime;
 			lastLocalTimeRef.current = 0;
 			lastTranscodeRestartAtRef.current = Date.now();
-			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, currentTime, relativeIndex));
+			setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, currentTime, relativeIndex, burnSubtitleIndexRef.current));
 			return;
 		}
 
@@ -958,18 +1139,40 @@ export function useVideoPlayer(
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
-			if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
 
-			event.preventDefault();
-			const step = event.key === "ArrowLeft" ? -10 : 10;
-			const maxTime = duration > 0 ? duration : Number.POSITIVE_INFINITY;
-			const nextTime = Math.max(0, Math.min(currentTimeRef.current + step, maxTime));
-			seekTo(nextTime);
+			const video = videoRef.current;
+
+			if (event.key === " " || event.code === "Space") {
+				event.preventDefault();
+				if (video) {
+					if (video.paused) void video.play();
+					else video.pause();
+				}
+				return;
+			}
+
+			if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+				event.preventDefault();
+				if (video) {
+					const next = Math.max(0, Math.min(1, video.volume + (event.key === "ArrowUp" ? 0.1 : -0.1)));
+					video.volume = next;
+					video.muted = next === 0;
+				}
+				return;
+			}
+
+			if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+				event.preventDefault();
+				const step = event.key === "ArrowLeft" ? -10 : 10;
+				const maxTime = duration > 0 ? duration : Number.POSITIVE_INFINITY;
+				const nextTime = Math.max(0, Math.min(currentTimeRef.current + step, maxTime));
+				seekTo(nextTime);
+			}
 		};
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [duration, seekTo, type]);
+	}, [duration, seekTo, type, videoRef]);
 
 	return {
 		audioTracks,

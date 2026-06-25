@@ -12,7 +12,7 @@ import {
 	SpeakerXMarkIcon
 } from "@heroicons/react/24/outline";
 import { Dialog, DialogPanel, DialogTitle, Select } from "@headlessui/react";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePictureInPicture } from "../hooks/usePictureInPicture";
 import { useVideoPlayer } from "../hooks/useVideoPlayer";
@@ -74,6 +74,7 @@ interface SubtitleUiOption {
 	label: string;
 	language: string;
 	source: "external" | "embedded";
+	bitmap?: boolean;
 }
 
 function formatSubtitleLanguage(language: string): string {
@@ -103,11 +104,13 @@ function getSubtitleTitle(option: SubtitleUiOption, index: number): string {
 }
 
 function getSubtitleMeta(option: SubtitleUiOption): string {
+	if (option.bitmap) return "Image track — burned into video";
 	return option.source === "embedded" ? "Embedded track" : "Provider subtitle";
 }
 
 export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpisode, backTo, backLabel }: PlayerProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
+	const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const navigate = useNavigate();
 	const [isHovered, setIsHovered] = useState(true);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -146,6 +149,27 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 	} = useVideoPlayer(videoRef, streamUrl, channelInfo.type, subtitles);
 
 	const controlsVisible = isHovered || isPaused || isSettingsOpen || isInfoOpen;
+
+	const showControls = useCallback(() => {
+		setIsHovered(true);
+		if (hideTimer.current) clearTimeout(hideTimer.current);
+		if (!isPaused && !isSettingsOpen && !isInfoOpen) {
+			hideTimer.current = setTimeout(() => setIsHovered(false), 3000);
+		}
+	}, [isPaused, isSettingsOpen, isInfoOpen]);
+
+	// Keep cursor visible while paused / dialogs open; restart timer on close/play
+	useEffect(() => {
+		if (isPaused || isSettingsOpen || isInfoOpen) {
+			if (hideTimer.current) clearTimeout(hideTimer.current);
+			setIsHovered(true);
+		} else {
+			showControls();
+		}
+	}, [isPaused, isSettingsOpen, isInfoOpen, showControls]);
+
+	useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
+
 	const canOfferNextEpisode = Boolean(nextEpisode && duration > 0 && duration - currentTime <= 45);
 
 	const playNextEpisode = () => {
@@ -178,8 +202,9 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 	return (
 		<div
 			className="relative bg-black text-secondary min-h-screen flex items-center justify-center overflow-hidden"
-			onMouseMove={() => setIsHovered(true)}
+			onMouseMove={showControls}
 			onMouseLeave={() => setIsHovered(false)}
+			style={{ cursor: controlsVisible ? "default" : "none" }}
 		>
 			<video
 				ref={videoRef}
@@ -212,11 +237,11 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 						<button
 							type="button"
 							onClick={handleBack}
-							title={backLabel ? `Retour — ${backLabel}` : "Retour"}
+							title={backLabel ? `Back — ${backLabel}` : "Back"}
 							className="flex flex-none items-center gap-1.5 rounded-full bg-white/10 py-2 pl-2 pr-3.5 text-white transition-colors hover:bg-secondary-400 hover:text-dark"
 						>
 							<ArrowLeftIcon className="h-6 w-6 flex-none" />
-							<span className="max-w-[28vw] truncate text-sm font-semibold">{backLabel ?? "Retour"}</span>
+							<span className="text-sm font-semibold">Back</span>
 						</button>
 						<div className="min-w-0">
 							<h1 className="truncate text-lg font-bold text-white">{channelInfo.name}</h1>
@@ -436,6 +461,11 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 														<span className="rounded bg-white/10 px-1.5 py-0.5 uppercase tracking-wide">
 															{track.source === "embedded" ? "Embedded" : "Provider"}
 														</span>
+														{track.bitmap && (
+															<span className="rounded bg-amber-500/20 px-1.5 py-0.5 uppercase tracking-wide text-amber-300">
+																Image
+															</span>
+														)}
 														<span>{loading ? "Preparing..." : getSubtitleMeta(track)}</span>
 													</span>
 												</span>

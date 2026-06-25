@@ -4,8 +4,10 @@ import type {
 	EmbeddedSubtitleWindowResult,
 	StreamProxyResult,
 	PlayableStreamResult,
+	LiveStreamResult,
 	StreamInfoResult,
-	AppUsageStats
+	AppUsageStats,
+	FfmpegServerStats
 } from "./types";
 
 declare global {
@@ -24,12 +26,14 @@ declare global {
 				durationSeconds: number
 			) => Promise<EmbeddedSubtitleWindowResult>;
 			resolvePlayableStream: (streamUrl: string) => Promise<PlayableStreamResult>;
+			resolveLiveStream: (streamUrl: string) => Promise<LiveStreamResult>;
 			createStreamProxy: (streamUrl: string) => Promise<StreamProxyResult>;
 			releaseStreamProxy: (proxyId: string) => Promise<{ ok: boolean }>;
 			probeStreamInfo: (streamUrl: string) => Promise<StreamInfoResult>;
 			stopTranscoding: () => Promise<{ ok: boolean }>;
 			getAppUsageStats: () => Promise<AppUsageStats>;
 			getSystemStats: () => Promise<AppUsageStats>;
+			getFfmpegStats: () => Promise<FfmpegServerStats>;
 			platformInfo: {
 				arch: string;
 				platform: string;

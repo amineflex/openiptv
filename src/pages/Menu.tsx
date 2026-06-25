@@ -129,28 +129,31 @@ export default function Menu() {
 
 	return (
 		<div className="relative min-h-screen overflow-hidden bg-dark text-secondary">
+			{/* Ambient blobs — scaled up on large screens */}
 			<div className="pointer-events-none absolute inset-0">
-				<div className="absolute -top-32 right-1/4 h-[32rem] w-[32rem] rounded-full bg-secondary-400/10 blur-3xl" />
-				<div className="absolute -bottom-20 left-0 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
+				<div className="absolute -top-32 right-1/4 h-[32rem] w-[32rem] rounded-full bg-secondary-400/10 blur-3xl 2xl:h-[52rem] 2xl:w-[52rem]" />
+				<div className="absolute -bottom-20 left-0 h-80 w-80 rounded-full bg-primary/20 blur-3xl 2xl:h-[30rem] 2xl:w-[30rem]" />
 			</div>
 
-			<div className="fade-in relative mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-7">
+			{/* Content — wider container on 2K/4K */}
+			<div className="fade-in relative mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-7 2xl:max-w-[112rem] 2xl:px-12">
+
 				<header className="flex flex-col gap-5 border-b border-white/10 pb-6 md:flex-row md:items-center md:justify-between">
 					<div className="min-w-0">
 						<p className="text-xs font-semibold uppercase tracking-widest text-secondary-700">OpenIPTV</p>
-						<h1 className="mt-1 truncate text-3xl font-bold text-white">
+						<h1 className="mt-1 truncate text-3xl font-bold text-white 2xl:text-4xl">
 							Hey <span className="text-secondary-400">{stream.name}</span>
 						</h1>
 					</div>
 
 					<nav className="flex flex-wrap items-center gap-3">
 						<div className="flex flex-col items-end leading-tight">
-							<span className="text-2xl font-bold tabular-nums text-white">{currentTime}</span>
+							<span className="text-2xl font-bold tabular-nums text-white 2xl:text-3xl">{currentTime}</span>
 							<span className="text-xs font-medium capitalize text-secondary-700">{formatDate()}</span>
 						</div>
 						<Link
 							to="settings"
-							className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-secondary backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400 hover:text-dark"
+							className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-secondary backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400 hover:text-dark 2xl:px-5 2xl:py-3 2xl:text-base"
 						>
 							<Cog6ToothIcon className="h-5 w-5" />
 							Settings
@@ -158,21 +161,42 @@ export default function Menu() {
 					</nav>
 				</header>
 
-				<main className="grid flex-1 gap-6 py-8 lg:grid-cols-[1fr_320px]">
-					<section className="grid auto-rows-fr gap-4 md:grid-cols-3">
-						{menuItems.map(({ title, description, to, accent, icon: Icon }) => (
+				{/*
+					Main layout:
+					  - Default / lg:  [cards section | sidebar 320px]
+					  - 2xl (1536px+): [cards section | sidebar 460px]
+
+					Cards section:
+					  - md:  3 equal columns (Live TV | Movies | Series)
+					  - 2xl: 2 columns, 2 rows — Live TV spans both rows on the left;
+					         Movies (row 1) and Series (row 2) stack on the right
+				*/}
+				<main className="grid flex-1 gap-6 py-8 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_460px]">
+
+					<section className="grid auto-rows-fr gap-4 md:grid-cols-3 2xl:grid-cols-2 2xl:grid-rows-2">
+						{menuItems.map(({ title, description, to, accent, icon: Icon }, index) => (
 							<Link
 								key={to}
 								to={to}
-								className="group relative flex min-h-80 flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition duration-200 hover:-translate-y-1 hover:border-secondary-400/40 hover:shadow-2xl hover:shadow-black/40 focus:outline-none focus:ring-2 focus:ring-secondary-400"
+								className={[
+									"group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition duration-200",
+									"hover:-translate-y-1 hover:border-secondary-400/40 hover:shadow-2xl hover:shadow-black/40",
+									"focus:outline-none focus:ring-2 focus:ring-secondary-400",
+									"min-h-80 2xl:min-h-0",
+									// On 2xl: Live TV spans both rows in the left column
+									index === 0 ? "2xl:row-span-2" : "",
+									"2xl:p-8"
+								].join(" ")}
 							>
 								<div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-80 transition group-hover:opacity-100`} />
-								<span className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-black/30 text-white ring-1 ring-white/10 transition group-hover:bg-secondary-400 group-hover:text-dark">
-									<Icon className="h-8 w-8" />
+
+								<span className="relative inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-black/30 text-white ring-1 ring-white/10 transition group-hover:bg-secondary-400 group-hover:text-dark 2xl:h-16 2xl:w-16">
+									<Icon className="h-8 w-8 2xl:h-9 2xl:w-9" />
 								</span>
+
 								<span className="relative">
-									<span className="block text-3xl font-bold text-white">{title}</span>
-									<span className="mt-2 flex items-center gap-1 text-sm text-secondary-800">
+									<span className="block text-3xl font-bold text-white 2xl:text-4xl">{title}</span>
+									<span className="mt-2 flex items-center gap-1 text-sm text-secondary-800 2xl:text-base">
 										{description}
 										<ArrowRightIcon className="h-4 w-4 -translate-x-1 opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" />
 									</span>
@@ -184,48 +208,48 @@ export default function Menu() {
 					<aside className="flex flex-col gap-4">
 						<Link
 							to="account"
-							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400"
+							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-6"
 						>
 							<div className="flex items-center gap-3">
-								<UserCircleIcon className="h-9 w-9 text-secondary-400 transition group-hover:text-secondary" />
+								<UserCircleIcon className="h-9 w-9 flex-none text-secondary-400 transition group-hover:text-secondary 2xl:h-11 2xl:w-11" />
 								<div className="min-w-0">
 									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Connected as</p>
-									<p className="truncate text-lg font-bold text-white">{stream.username}</p>
+									<p className="truncate text-lg font-bold text-white 2xl:text-xl">{stream.username}</p>
 								</div>
 							</div>
 						</Link>
 
 						<Link
 							to="account"
-							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400"
+							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-6"
 						>
 							<div className="flex items-center gap-3">
-								<CalendarDaysIcon className="h-8 w-8 text-secondary-400 transition group-hover:text-secondary" />
+								<CalendarDaysIcon className="h-9 w-9 flex-none text-secondary-400 transition group-hover:text-secondary 2xl:h-11 2xl:w-11" />
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Subscription ends</p>
-									<p className="text-lg font-bold text-white">{expirationDate}</p>
+									<p className="text-lg font-bold text-white 2xl:text-xl">{expirationDate}</p>
 								</div>
 							</div>
 						</Link>
 
 						<Link
 							to="favourites"
-							className="group rounded-2xl border border-white/10 bg-gradient-to-br from-secondary-400/15 to-transparent p-5 backdrop-blur transition hover:border-secondary-400/50 hover:from-secondary-400/25 focus:outline-none focus:ring-2 focus:ring-secondary-400"
+							className="group rounded-2xl border border-white/10 bg-gradient-to-br from-secondary-400/15 to-transparent p-8 backdrop-blur transition hover:border-secondary-400/50 hover:from-secondary-400/25 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-6"
 						>
 							<div className="flex items-center gap-3">
-								<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary-400/15 text-secondary-400 transition group-hover:bg-secondary-400 group-hover:text-dark">
-									<HeartIcon className="h-6 w-6" />
+								<span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-secondary-400/15 text-secondary-400 transition group-hover:bg-secondary-400 group-hover:text-dark 2xl:h-12 2xl:w-12">
+									<HeartIcon className="h-6 w-6 2xl:h-7 2xl:w-7" />
 								</span>
 								<div>
 									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Favourites</p>
-									<p className="text-lg font-bold text-white">Movies &amp; series</p>
+									<p className="text-lg font-bold text-white 2xl:text-xl">Movies &amp; series</p>
 								</div>
 							</div>
 						</Link>
 
 						<Link
 							to="/"
-							className="mt-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-secondary transition hover:border-secondary-400/50 hover:bg-secondary-400 hover:text-dark"
+							className="mt-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-secondary transition hover:border-secondary-400/50 hover:bg-secondary-400 hover:text-dark 2xl:py-4 2xl:text-base"
 						>
 							<ArrowLeftIcon className="h-5 w-5" />
 							Back to profiles

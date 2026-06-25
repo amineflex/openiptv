@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld("openIptv", {
 	resolvePlayableStream: (streamUrl: string) =>
 		ipcRenderer.invoke("media:resolve-playable-stream", streamUrl),
 
+	resolveLiveStream: (streamUrl: string) =>
+		ipcRenderer.invoke("media:resolve-live-stream", streamUrl),
+
 	createStreamProxy: (streamUrl: string) =>
 		ipcRenderer.invoke("media:create-stream-proxy", streamUrl),
 
@@ -42,6 +45,9 @@ contextBridge.exposeInMainWorld("openIptv", {
 
 	getSystemStats: () =>
 		ipcRenderer.invoke("stats:get-system"),
+
+	getFfmpegStats: () =>
+		ipcRenderer.invoke("stats:get-ffmpeg"),
 
 	// Static — read once. process.platform/arch are available even in a
 	// sandboxed preload; Node builtins like "os" are NOT (they crash the

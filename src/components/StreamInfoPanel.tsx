@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import { InformationCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
-import type { AppUsageStats, StreamInfoResult, StreamProbeStream } from "../types";
+import type {
+	AppUsageStats,
+	FfmpegServerStats,
+	FfmpegSessionStats,
+	StreamInfoResult,
+	StreamProbeStream
+} from "../types";
 
 interface VideoStats {
 	bufferSec: number;
@@ -102,6 +108,21 @@ function formatKbps(kbps: number): string {
 	return `${Math.round(kbps)} Kbps`;
 }
 
+function formatElapsed(seconds: number): string {
+	if (!Number.isFinite(seconds) || seconds <= 0) return "0s";
+	const total = Math.floor(seconds);
+	const h = Math.floor(total / 3600);
+	const m = Math.floor((total % 3600) / 60);
+	const s = total % 60;
+	if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+	if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+	return `${s}s`;
+}
+
+function formatCount(count: number, singular: string, plural = `${singular}s`): string {
+	return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function barColor(percent: number): string {
 	if (percent >= 80) return "bg-red-500";
 	if (percent >= 60) return "bg-amber-400";
@@ -193,10 +214,90 @@ function SubtitleRow({ s }: { s: StreamProbeStream }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+function FfmpegSessionCard({ session }: { session: FfmpegSessionStats }) {
+	const modeLabel = session.mode === "live" ? "Live audio transcode" : "VOD transcode";
+	const processValue = session.cpuPercent !== undefined && session.ramMB !== undefined
+		? `${session.cpuPercent}% / ${formatMB(session.ramMB)}`
+		: undefined;
+	const outputValue = `${formatKbps(session.outputKbps)} avg / ${formatMB(session.outputMB)}`;
+
+	return (
+		<div className="rounded-xl bg-primary/10 px-3.5 py-3">
+			<div className="mb-2 flex items-center justify-between gap-3">
+				<span className="text-sm font-bold text-white">{modeLabel}</span>
+				{session.activeRequests > 0 && (
+					<span className="rounded-full bg-green-400/15 px-2 py-0.5 text-[10px] font-black uppercase text-green-300">
+						Active
+					</span>
+				)}
+			</div>
+			<Row label="PID" value={session.pid ? String(session.pid) : undefined} />
+			<Row label="Runtime" value={formatElapsed(session.uptimeSeconds)} />
+			<Row label="Process" value={processValue} />
+			<Row label="Output" value={outputValue} />
+			<Row label="Codecs" value={`${session.videoCodec.toUpperCase()} / ${session.audioCodec.toUpperCase()}`} />
+			{session.startSeconds !== undefined && session.startSeconds > 0 && (
+				<Row label="Offset" value={formatElapsed(session.startSeconds)} />
+			)}
+			{session.audioIndex !== undefined && (
+				<Row label="Audio track" value={String(session.audioIndex + 1)} />
+			)}
+			{session.burnSubtitleIndex !== undefined && (
+				<Row label="Burned subtitle" value={`Track ${session.burnSubtitleIndex + 1}`} />
+			)}
+		</div>
+	);
+}
+
+function FfmpegServerSection({ stats }: { stats: FfmpegServerStats }) {
+	const sourceSummary = [
+		formatCount(stats.sourceCount, "source"),
+		formatCount(stats.proxyCount, "proxy", "proxies")
+	].join(" / ");
+	const status = stats.activeSessionCount > 0 ? "Decoding" : "Ready";
+
+	return (
+		<section className="border-b border-white/[0.07] px-5 py-4">
+			<SectionTitle>
+				<span className="flex items-center gap-2">
+					FFmpeg Decode Server
+					{stats.activeSessionCount > 0 && (
+						<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
+					)}
+				</span>
+			</SectionTitle>
+
+			<div className="space-y-3">
+				<div>
+					<Row label="Status" value={status} />
+					<Row label="Endpoint" value={stats.port ? `127.0.0.1:${stats.port}` : undefined} />
+					<Row label="FFmpeg" value={stats.available ? "Available" : "Missing"} />
+					<Row label="Sources" value={sourceSummary} />
+					<Row label="Requests" value={String(stats.activeRequestCount)} />
+					<Row label="Output" value={formatMB(stats.totalOutputMB)} />
+				</div>
+
+				{stats.sessions.length > 0 ? (
+					<div className="space-y-2">
+						{stats.sessions.map((session) => (
+							<FfmpegSessionCard key={`${session.sourceId}:${session.pid ?? "pending"}`} session={session} />
+						))}
+					</div>
+				) : (
+					<p className="rounded-xl bg-primary/10 px-3.5 py-3 text-xs text-gray-500">
+						No active FFmpeg process
+					</p>
+				)}
+			</div>
+		</section>
+	);
+}
+
 export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: Props) {
 	const [info, setInfo] = useState<StreamInfoResult | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [appStats, setAppStats] = useState<AppUsageStats | null>(null);
+	const [ffmpegStats, setFfmpegStats] = useState<FfmpegServerStats | null>(null);
 	const [videoStats, setVideoStats] = useState<VideoStats | null>(null);
 
 	// Probe stream info (static, once per open+url)
@@ -225,6 +326,7 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 	useEffect(() => {
 		if (!open) {
 			setAppStats(null);
+			setFfmpegStats(null);
 			setVideoStats(null);
 			return;
 		}
@@ -232,11 +334,18 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 		let active = true;
 
 		const tick = async () => {
-			const usage = await (
+			const usageRequest = (
 				window.openIptv?.getAppUsageStats?.()
 				?? window.openIptv?.getSystemStats?.()
+				?? Promise.resolve(null)
 			);
+			const ffmpegRequest = window.openIptv?.getFfmpegStats?.() ?? Promise.resolve(null);
+			const [usage, ffmpeg] = await Promise.all([
+				usageRequest.catch(() => null),
+				ffmpegRequest.catch(() => null)
+			]);
 			if (active && usage) setAppStats(usage);
+			if (active && ffmpeg) setFfmpegStats(ffmpeg);
 
 			// Video element stats
 			const video = videoRef?.current;
@@ -273,6 +382,10 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 	const videoStreams = (info?.streams ?? []).filter((s) => (s as StreamProbeStream).codec_type === "video") as StreamProbeStream[];
 	const audioStreams = (info?.streams ?? []).filter((s) => (s as StreamProbeStream).codec_type === "audio") as StreamProbeStream[];
 	const subStreams   = (info?.streams ?? []).filter((s) => (s as StreamProbeStream).codec_type === "subtitle") as StreamProbeStream[];
+	const showFfmpegStats = Boolean(
+		(ffmpegStats?.activeSessionCount ?? 0) > 0
+		|| (ffmpegStats?.sourceCount ?? 0) > 0
+	);
 
 	return (
 		<Dialog open={open} onClose={onClose} className="relative z-[60]">
@@ -374,6 +487,10 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 						</section>
 
 						{/* ── Stream probe ─────────────────────────────── */}
+						{showFfmpegStats && ffmpegStats && (
+							<FfmpegServerSection stats={ffmpegStats} />
+						)}
+
 						{loading && (
 							<div className="flex flex-col items-center justify-center gap-3 py-16">
 								<div className="h-8 w-8 animate-spin rounded-full border-2 border-secondary-400 border-t-transparent" />

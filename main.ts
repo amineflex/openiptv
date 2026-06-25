@@ -192,6 +192,9 @@ interface EmbeddedTrack {
 	codec: string;
 	label: string;
 	language: string;
+	// Bitmap (image) subtitles can't become WebVTT — they must be burned into
+	// the video via ffmpeg overlay. The renderer routes these to that path.
+	bitmap: boolean;
 }
 
 interface ListResult {
@@ -228,6 +231,7 @@ interface PlayableStreamResult {
 	transcodeBaseUrl?: string;
 	defaultAudioIndex?: number;
 	durationSeconds?: number;
+	requiresMpegTsPlayer?: boolean;
 	error?: string;
 }
 
@@ -255,6 +259,35 @@ interface AppUsageStats {
 	processes: AppProcessUsage[];
 }
 
+interface FfmpegSessionStats {
+	sourceId: string;
+	pid?: number;
+	mode: "live" | "vod";
+	uptimeSeconds: number;
+	startSeconds?: number;
+	audioIndex?: number;
+	burnSubtitleIndex?: number;
+	videoCodec: string;
+	audioCodec: string;
+	outputKbps: number;
+	outputMB: number;
+	activeRequests: number;
+	cpuPercent?: number;
+	ramMB?: number;
+}
+
+interface FfmpegServerStats {
+	available: boolean;
+	serverRunning: boolean;
+	port?: number;
+	sourceCount: number;
+	proxyCount: number;
+	activeSessionCount: number;
+	activeRequestCount: number;
+	totalOutputMB: number;
+	sessions: FfmpegSessionStats[];
+}
+
 interface AudioProbeStream {
 	index: number;
 	codec_type?: string;
@@ -274,6 +307,7 @@ interface AudioProbeOutput {
 	streams?: AudioProbeStream[];
 	format?: {
 		duration?: string;
+		format_name?: string;
 	};
 }
 
@@ -281,18 +315,28 @@ interface AudioProbeResult {
 	streams: AudioProbeStream[];
 	durationSeconds?: number;
 	videoFps?: string;
+	isMpegTs?: boolean;
 }
 
 // Only text-based subtitle codecs can be converted to WebVTT.
-// Bitmap subtitles (hdmv_pgs_subtitle, dvd_subtitle, dvb_subtitle...) cannot.
 const TEXT_SUBTITLE_CODECS = new Set([
 	"subrip", "srt", "ass", "ssa", "mov_text", "webvtt", "vtt", "text", "microdvd", "micro_dvd"
+]);
+
+// Bitmap subtitles are images: they can't become WebVTT, so the only way to
+// show them in a Chromium <video> is to burn them into the picture with an
+// ffmpeg overlay (hardsub) while transcoding.
+const BITMAP_SUBTITLE_CODECS = new Set([
+	"hdmv_pgs_subtitle", "pgssub", "dvd_subtitle", "dvdsub", "dvb_subtitle", "dvbsub", "xsub"
 ]);
 
 const UNSUPPORTED_BROWSER_AUDIO_CODECS = new Set(["ac3", "eac3", "truehd", "dts", "dts_hd"]);
 interface TranscodeSource {
 	url: string;
 	videoFps?: string;
+	// Live channels need only an audio re-encode (video is copied untouched),
+	// and skip the VOD seek/PTS-normalization filtergraph entirely.
+	live?: boolean;
 }
 
 const transcodeSources = new Map<string, TranscodeSource>();
@@ -315,6 +359,16 @@ const childCpuSamples = new Map<number, { cpuSeconds: number; sampledAt: number 
 // time, so a process still alive here when a new one starts is stale and leaking.
 type TranscodeProcess = ReturnType<typeof spawn>;
 const activeTranscodes = new Set<TranscodeProcess>();
+const activeTranscodeInfos = new Map<TranscodeProcess, {
+	sourceId: string;
+	mode: "live" | "vod";
+	startedAt: number;
+	startSeconds?: number;
+	audioIndex?: number;
+	burnSubtitleIndex?: number;
+	videoCodec: string;
+	audioCodec: string;
+}>();
 
 let childProcessUsageRequest: Promise<AppProcessUsage[]> | null = null;
 let childProcessUsageCache: { pidsKey: string; updatedAt: number; usages: AppProcessUsage[] } = {
@@ -699,6 +753,7 @@ function handleStreamProxyRequest(
 
 function killTranscode(proc: TranscodeProcess): void {
 	activeTranscodes.delete(proc);
+	activeTranscodeInfos.delete(proc);
 
 	// Already exited — nothing to do.
 	if (proc.exitCode !== null || proc.signalCode !== null) return;
@@ -818,7 +873,7 @@ function packetsToVtt(packets: Array<{ pts_time?: string; duration_time?: string
 	return `WEBVTT\n\n${cues.join("\n")}`.trimEnd() + "\n";
 }
 
-function probeAudioStreams(url: string): Promise<AudioProbeResult> {
+function probeAudioStreams(url: string, timeoutMs?: number): Promise<AudioProbeResult> {
 	return new Promise((resolve, reject) => {
 		const proc = spawn(FFPROBE, [
 			"-v", "quiet",
@@ -830,10 +885,14 @@ function probeAudioStreams(url: string): Promise<AudioProbeResult> {
 
 		let stdout = "";
 		let stderr = "";
+		// Live sources can stall on a dead upstream — cap the probe so opening a
+		// channel never hangs. VOD passes no timeout (finite files respond fast).
+		const killTimer = timeoutMs ? setTimeout(() => { if (!proc.killed) proc.kill(); }, timeoutMs) : null;
 		proc.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
 		proc.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
 
 		proc.on("close", (code) => {
+			if (killTimer) clearTimeout(killTimer);
 			if (code !== 0) {
 				reject(new Error(stderr.trim() || `ffprobe exited with code ${code ?? "unknown"}`));
 				return;
@@ -843,10 +902,12 @@ function probeAudioStreams(url: string): Promise<AudioProbeResult> {
 				const parsed = JSON.parse(stdout) as AudioProbeOutput;
 				const streams = parsed.streams ?? [];
 				const videoStream = streams.find((stream) => stream.codec_type === "video");
+				const fmtName = parsed.format?.format_name ?? "";
 				resolve({
 					streams: streams.filter((stream) => stream.codec_type === "audio"),
 					durationSeconds: parseDurationSeconds(parsed.format?.duration),
-					videoFps: parseFrameRate(videoStream?.avg_frame_rate) ?? parseFrameRate(videoStream?.r_frame_rate)
+					videoFps: parseFrameRate(videoStream?.avg_frame_rate) ?? parseFrameRate(videoStream?.r_frame_rate),
+					isMpegTs: fmtName.split(",").some((f) => f.trim() === "mpegts")
 				});
 			} catch (error) {
 				logger.exception("Failed to parse audio probe output", error, {
@@ -857,6 +918,7 @@ function probeAudioStreams(url: string): Promise<AudioProbeResult> {
 			}
 		});
 		proc.on("error", (error) => {
+			if (killTimer) clearTimeout(killTimer);
 			logger.exception("Failed to run ffprobe for audio streams", error, {
 				url
 			});
@@ -887,6 +949,12 @@ function ensureTranscodeServer(): Promise<number> {
 			const match = requestUrl.pathname.match(/^\/transcode\/([^/]+)$/);
 			const startTime = Math.max(0, Number(requestUrl.searchParams.get("start") ?? 0) || 0);
 			const audioIndex = Math.max(0, Math.trunc(Number(requestUrl.searchParams.get("audio") ?? 0)) || 0);
+			// Optional bitmap subtitle (PGS/DVD/DVB) to burn into the picture, given
+			// as a subtitle-relative index (ffmpeg's 0:s:N). Absent for normal playback.
+			const subtitleParam = requestUrl.searchParams.get("subtitle");
+			const burnSubtitleIndex = subtitleParam != null && /^\d+$/.test(subtitleParam)
+				? Number(subtitleParam)
+				: null;
 
 			if (!match) {
 				logger.warn("Transcode request did not match a known route", {
@@ -927,31 +995,86 @@ function ensureTranscodeServer(): Promise<number> {
 				finishMediaRequest(match[1]);
 			};
 
-			const args = [
-				"-hide_banner",
-				"-loglevel", "error",
-				"-fflags", "+genpts",
-				...(startTime > 0 ? ["-ss", startTime.toFixed(3)] : []),
-				"-i", sourceUrl,
-				"-map", "0:v:0?",
-				"-map", `0:a:${audioIndex}?`,
-				"-vf", `settb=AVTB,setpts=N/((${videoFps})*TB)`,
-				"-c:v", "libx264",
-				"-preset", "veryfast",
-				"-crf", "23",
-				"-pix_fmt", "yuv420p",
-				"-af", "aresample=async=1:first_pts=0,asetpts=N/SR/TB",
-				"-c:a", "aac",
-				"-ac", "2",
-				"-b:a", "192k",
-				"-muxdelay", "0",
-				"-muxpreload", "0",
-				"-mpegts_flags", "+resend_headers",
-				"-f", "mpegts",
-				"pipe:1"
-			];
+			let args: string[];
+			if (transcodeSource.live) {
+				// Live: the video already plays fine in mpegts.js — only the
+				// AC3/E-AC3/DTS audio is undecodable. Copy the video untouched (cheap,
+				// low-latency, no quality loss) and re-encode just the audio to AAC.
+				// No -ss/PTS-normalization: a live feed is continuous and never seeks.
+				// Reconnect flags keep the upstream fetch alive across brief hiccups.
+				args = [
+					"-hide_banner",
+					"-loglevel", "error",
+					"-fflags", "+genpts+discardcorrupt",
+					"-reconnect", "1",
+					"-reconnect_streamed", "1",
+					"-reconnect_delay_max", "5",
+					"-i", sourceUrl,
+					"-map", "0:v:0?",
+					"-map", "0:a?",
+					"-c:v", "copy",
+					"-c:a", "aac",
+					"-ac", "2",
+					"-b:a", "192k",
+					"-muxdelay", "0",
+					"-muxpreload", "0",
+					"-mpegts_flags", "+resend_headers",
+					"-f", "mpegts",
+					"pipe:1"
+				];
+			} else {
+				// Normalize the video timeline to a clean CFR-ish PTS so mpegts.js and
+				// the seek/resume bookkeeping behave. When burning a bitmap subtitle,
+				// overlay it first (using the source's native, mutually-consistent
+				// timestamps so it stays in sync) and normalize the combined result;
+				// eof_action=pass lets the video continue once the subtitle stream ends.
+				const setptsExpr = `settb=AVTB,setpts=N/((${videoFps})*TB)`;
+				const videoArgs = burnSubtitleIndex !== null
+					? [
+						"-filter_complex",
+						`[0:v:0][0:s:${burnSubtitleIndex}]overlay=eof_action=pass[ov];[ov]${setptsExpr}[v]`,
+						"-map", "[v]"
+					]
+					: [
+						"-map", "0:v:0?",
+						"-vf", setptsExpr
+					];
+
+				args = [
+					"-hide_banner",
+					"-loglevel", "error",
+					"-fflags", "+genpts",
+					...(startTime > 0 ? ["-ss", startTime.toFixed(3)] : []),
+					"-i", sourceUrl,
+					...videoArgs,
+					"-map", `0:a:${audioIndex}?`,
+					"-c:v", "libx264",
+					"-preset", "veryfast",
+					"-crf", "23",
+					"-pix_fmt", "yuv420p",
+					"-af", "aresample=async=1:first_pts=0,asetpts=N/SR/TB",
+					"-c:a", "aac",
+					"-ac", "2",
+					"-b:a", "192k",
+					"-muxdelay", "0",
+					"-muxpreload", "0",
+					"-mpegts_flags", "+resend_headers",
+					"-f", "mpegts",
+					"pipe:1"
+				];
+			}
 			const proc = spawn(FFMPEG, args);
 			activeTranscodes.add(proc);
+			activeTranscodeInfos.set(proc, {
+				sourceId: match[1],
+				mode: transcodeSource.live ? "live" : "vod",
+				startedAt: Date.now(),
+				startSeconds: transcodeSource.live ? undefined : startTime,
+				audioIndex: transcodeSource.live ? undefined : audioIndex,
+				burnSubtitleIndex: burnSubtitleIndex ?? undefined,
+				videoCodec: transcodeSource.live ? "copy" : "libx264",
+				audioCodec: "aac"
+			});
 
 			// Drain stderr: if nobody reads it, a full OS pipe buffer makes ffmpeg
 			// block mid-write and freeze, which then ignores the dead stdout pipe.
@@ -972,6 +1095,7 @@ function ensureTranscodeServer(): Promise<number> {
 			});
 			proc.on("close", () => {
 				activeTranscodes.delete(proc);
+				activeTranscodeInfos.delete(proc);
 				finishTranscodeMediaRequest();
 			});
 
@@ -1013,6 +1137,18 @@ async function createTranscodedAudioUrl(sourceUrl: string, videoFps?: string): P
 		sourceId: id,
 		sourceUrl,
 		videoFps
+	});
+	return `http://127.0.0.1:${port}/transcode/${id}`;
+}
+
+async function createLiveTranscodeUrl(sourceUrl: string): Promise<string> {
+	const port = await ensureTranscodeServer();
+	const id = randomUUID();
+	transcodeSources.set(id, { url: sourceUrl, live: true });
+	getOrCreateMediaCounter(id);
+	logger.debug("Created live transcode source", {
+		sourceId: id,
+		sourceUrl
 	});
 	return `http://127.0.0.1:${port}/transcode/${id}`;
 }
@@ -1118,8 +1254,12 @@ ipcMain.handle("subtitle:list-embedded", async (_event, rawUrl: unknown): Promis
 
 				const tracks: EmbeddedTrack[] = streams
 					.map((stream, relativeIndex) => ({ stream, relativeIndex }))
-					.filter(({ stream }) => TEXT_SUBTITLE_CODECS.has((stream.codec_name ?? "").toLowerCase()))
+					.filter(({ stream }) => {
+						const codec = (stream.codec_name ?? "").toLowerCase();
+						return TEXT_SUBTITLE_CODECS.has(codec) || BITMAP_SUBTITLE_CODECS.has(codec);
+					})
 					.map(({ stream, relativeIndex }) => {
+						const codec = (stream.codec_name ?? "").toLowerCase();
 						const language = (stream.tags?.language ?? "und").slice(0, 3);
 						const label = stream.tags?.title?.trim()
 							|| (language !== "und" ? language.toUpperCase() : `Track ${stream.index}`);
@@ -1130,7 +1270,8 @@ ipcMain.handle("subtitle:list-embedded", async (_event, rawUrl: unknown): Promis
 							relativeIndex,
 							codec: stream.codec_name ?? "",
 							language,
-							label
+							label,
+							bitmap: BITMAP_SUBTITLE_CODECS.has(codec)
 						};
 					});
 
@@ -1329,14 +1470,22 @@ ipcMain.handle("media:resolve-playable-stream", async (_event, rawUrl: unknown):
 		const defaultAudioIndex = defaultIdx >= 0 ? defaultIdx : 0;
 
 		if (!shouldTranscodeAudio(audioStreams)) {
+			// Play natively, but still hand back a transcode base URL so the renderer
+			// can switch into a re-encode on demand if the user picks a bitmap
+			// subtitle that has to be burned into the picture.
+			const transcodeBaseUrl = await createTranscodedAudioUrl(url, probeResult.videoFps);
 			return {
 				ok: true,
 				url,
 				transcoded: false,
 				audioCodecs,
 				audioTracks,
+				transcodeBaseUrl,
 				defaultAudioIndex,
-				durationSeconds: probeResult.durationSeconds
+				durationSeconds: probeResult.durationSeconds,
+				// Chromium cannot play MPEG-TS via <video src> — the renderer must
+				// use mpegts.js (MSE) even though no audio re-encode is needed.
+				requiresMpegTsPlayer: probeResult.isMpegTs
 			};
 		}
 
@@ -1362,6 +1511,46 @@ ipcMain.handle("media:resolve-playable-stream", async (_event, rawUrl: unknown):
 			audioCodecs: [],
 			error: error instanceof Error ? error.message : "Failed to inspect audio streams"
 		};
+	}
+});
+
+interface LiveStreamResolveResult {
+	ok: boolean;
+	url: string;
+	transcoded: boolean;
+	error?: string;
+}
+
+ipcMain.handle("media:resolve-live-stream", async (_event, rawUrl: unknown): Promise<LiveStreamResolveResult> => {
+	let url: string;
+	try {
+		url = assertHttpUrl(rawUrl);
+	} catch (error) {
+		logger.warn("Rejected live stream resolve request", {
+			error: error instanceof Error ? error.message : "Invalid URL"
+		});
+		return { ok: false, url: "", transcoded: false, error: error instanceof Error ? error.message : "Invalid URL" };
+	}
+
+	try {
+		const probeResult = await probeAudioStreams(url, 12000);
+		if (!shouldTranscodeAudio(probeResult.streams)) {
+			// AAC/MP3 audio — mpegts.js plays it directly, no transcode needed.
+			return { ok: true, url, transcoded: false };
+		}
+
+		// AC3/E-AC3/DTS: mpegts.js drops these audio packets (no audio). Route the
+		// channel through the local audio-only transcode instead.
+		const transcodeUrl = await createLiveTranscodeUrl(url);
+		return { ok: true, url: transcodeUrl, transcoded: true };
+	} catch (error) {
+		// Probe failed (unreachable/slow upstream) — fall back to direct playback so
+		// AAC channels still work even when we couldn't inspect the codec.
+		logger.warn("Live stream audio probe failed; using direct playback", {
+			error: error instanceof Error ? error.message : String(error),
+			url
+		});
+		return { ok: true, url, transcoded: false };
 	}
 });
 
@@ -1467,8 +1656,62 @@ async function getAppUsageStats(): Promise<AppUsageStats> {
 	};
 }
 
+async function getFfmpegServerStats(): Promise<FfmpegServerStats> {
+	const now = Date.now();
+	const childProcesses = await getChildProcessUsages();
+	const childProcessByPid = new Map(childProcesses.map((usage) => [usage.pid, usage]));
+	const sessions: FfmpegSessionStats[] = [];
+
+	for (const [proc, info] of activeTranscodeInfos.entries()) {
+		const counter = mediaUsageCounters.get(info.sourceId);
+		const outputBytes = counter?.bytesTransferred ?? 0;
+		const uptimeSeconds = Math.max(0.001, (now - info.startedAt) / 1000);
+		const pid = proc.pid;
+		const processUsage = typeof pid === "number" ? childProcessByPid.get(pid) : undefined;
+
+		sessions.push({
+			sourceId: info.sourceId,
+			pid,
+			mode: info.mode,
+			uptimeSeconds: Math.round(uptimeSeconds),
+			startSeconds: info.startSeconds,
+			audioIndex: info.audioIndex,
+			burnSubtitleIndex: info.burnSubtitleIndex,
+			videoCodec: info.videoCodec,
+			audioCodec: info.audioCodec,
+			outputKbps: Math.round((outputBytes * 8) / 1000 / uptimeSeconds),
+			outputMB: Math.round((outputBytes / 1024 / 1024) * 10) / 10,
+			activeRequests: counter?.activeRequests ?? 0,
+			cpuPercent: processUsage?.cpuPercent,
+			ramMB: processUsage?.ramMB
+		});
+	}
+
+	let totalOutputBytes = 0;
+	let activeRequestCount = 0;
+	for (const id of transcodeSources.keys()) {
+		const counter = mediaUsageCounters.get(id);
+		if (!counter) continue;
+		totalOutputBytes += counter.bytesTransferred;
+		activeRequestCount += counter.activeRequests;
+	}
+
+	return {
+		available: FFMPEG_AVAILABLE,
+		serverRunning: transcodeServerPort !== null,
+		port: transcodeServerPort ?? undefined,
+		sourceCount: transcodeSources.size,
+		proxyCount: streamProxySources.size,
+		activeSessionCount: sessions.length,
+		activeRequestCount,
+		totalOutputMB: Math.round((totalOutputBytes / 1024 / 1024) * 10) / 10,
+		sessions
+	};
+}
+
 ipcMain.handle("stats:get-app-usage", () => getAppUsageStats());
 ipcMain.handle("stats:get-system", () => getAppUsageStats());
+ipcMain.handle("stats:get-ffmpeg", () => getFfmpegServerStats());
 
 app.on("before-quit", () => {
 	logger.info("Electron app is quitting");

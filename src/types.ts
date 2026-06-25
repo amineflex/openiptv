@@ -146,6 +146,9 @@ export interface EmbeddedSubtitleTrack {
 	codec: string;
 	label: string;
 	language: string;
+	// Bitmap subtitles (PGS/DVD/DVB) must be burned into the video via the
+	// transcoder rather than rendered as a WebVTT <track>.
+	bitmap?: boolean;
 }
 
 export interface EmbeddedSubtitleListResult {
@@ -182,6 +185,19 @@ export interface PlayableStreamResult {
 	transcodeBaseUrl?: string;
 	defaultAudioIndex?: number;
 	durationSeconds?: number;
+	// True when the container is MPEG-TS with native-compatible audio: Chromium
+	// cannot play MPEG-TS directly via <video src>, so the renderer must still
+	// use mpegts.js even though no audio re-encode is needed.
+	requiresMpegTsPlayer?: boolean;
+	error?: string;
+}
+
+export interface LiveStreamResult {
+	ok: boolean;
+	url: string;
+	// True when the audio (AC3/E-AC3/DTS) was transcoded to AAC because mpegts.js
+	// can't decode it. The url then points at the local transcode server.
+	transcoded: boolean;
 	error?: string;
 }
 
@@ -273,6 +289,35 @@ export interface AppUsageStats {
 	activeStreams: number;
 	gpuProcess?: AppProcessUsage;
 	processes: AppProcessUsage[];
+}
+
+export interface FfmpegSessionStats {
+	sourceId: string;
+	pid?: number;
+	mode: "live" | "vod";
+	uptimeSeconds: number;
+	startSeconds?: number;
+	audioIndex?: number;
+	burnSubtitleIndex?: number;
+	videoCodec: string;
+	audioCodec: string;
+	outputKbps: number;
+	outputMB: number;
+	activeRequests: number;
+	cpuPercent?: number;
+	ramMB?: number;
+}
+
+export interface FfmpegServerStats {
+	available: boolean;
+	serverRunning: boolean;
+	port?: number;
+	sourceCount: number;
+	proxyCount: number;
+	activeSessionCount: number;
+	activeRequestCount: number;
+	totalOutputMB: number;
+	sessions: FfmpegSessionStats[];
 }
 
 export type SystemStats = AppUsageStats;
