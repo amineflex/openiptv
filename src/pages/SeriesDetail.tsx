@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeftIcon, CalendarDaysIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
 import FavouriteButton from "../components/FavouriteButton";
 import NotFound from "../components/NotFound";
@@ -38,6 +38,7 @@ function getEpisodeSubtitles(episode: SeriesEpisode, domain: string): SubtitleTr
 
 export default function SeriesDetail() {
 	const { id, seriesId } = useParams();
+	const navigate = useNavigate();
 	const stream = useStreamLoader(id);
 	const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -233,13 +234,14 @@ export default function SeriesDetail() {
 			</div>
 
 			<div className="relative z-10 px-6 py-5">
-				<Link
-					to={`/menu/${id}/series`}
+				<button
+					type="button"
+					onClick={() => navigate(-1)}
 					className="inline-flex rounded-full bg-dark/55 p-2.5 text-secondary-400 backdrop-blur transition hover:bg-secondary-400 hover:text-dark"
-					aria-label="Back to series"
+					aria-label="Back"
 				>
 					<ArrowLeftIcon className="h-5 w-5" />
-				</Link>
+				</button>
 			</div>
 
 			<main className="fade-in relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-12">

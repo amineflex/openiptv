@@ -2,6 +2,7 @@ module.exports = {
 	packagerConfig: {
 		name: "OpenIPTV",
 		executableName: "OpenIPTV",
+		icon: "./icon",
 		overwrite: true,
 		download: {
 			cacheRoot: "E:/openiptvclient/.electron-cache"

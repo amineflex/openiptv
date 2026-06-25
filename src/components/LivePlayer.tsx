@@ -3,8 +3,6 @@ import {
 	ArrowsPointingInIcon,
 	ArrowsPointingOutIcon,
 	Cog6ToothIcon,
-	PauseIcon,
-	PlayIcon,
 	QueueListIcon,
 	ArrowTopRightOnSquareIcon,
 	SpeakerWaveIcon,
@@ -66,7 +64,6 @@ export default function LivePlayer({
 	// Video playback state
 	const [controlsVisible, setControlsVisible] = useState(true);
 	const [isBuffering, setIsBuffering] = useState(false);
-	const [isPaused, setIsPaused] = useState(false);
 	const [isMuted, setIsMuted] = useState(false);
 	const [volume, setVolumeState] = useState(1);
 	const [isFullscreen, setIsFullscreen] = useState(false);
@@ -116,17 +113,13 @@ export default function LivePlayer({
 		};
 
 		const onWaiting = () => setIsBuffering(true);
-		const onPlaying = () => { setIsBuffering(false); setIsPaused(false); };
-		const onPause = () => setIsPaused(true);
-		const onPlay = () => setIsPaused(false);
+		const onPlaying = () => setIsBuffering(false);
 		const onVolumeChange = () => { setVolumeState(video.volume); setIsMuted(video.muted); };
 		const onFullscreenChange = () =>
 			setIsFullscreen(document.fullscreenElement === video.parentElement);
 
 		video.addEventListener("waiting", onWaiting);
 		video.addEventListener("playing", onPlaying);
-		video.addEventListener("pause", onPause);
-		video.addEventListener("play", onPlay);
 		video.addEventListener("volumechange", onVolumeChange);
 		video.addEventListener("loadedmetadata", syncAudioTracks);
 		document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -134,8 +127,6 @@ export default function LivePlayer({
 		return () => {
 			video.removeEventListener("waiting", onWaiting);
 			video.removeEventListener("playing", onPlaying);
-			video.removeEventListener("pause", onPause);
-			video.removeEventListener("play", onPlay);
 			video.removeEventListener("volumechange", onVolumeChange);
 			video.removeEventListener("loadedmetadata", syncAudioTracks);
 			document.removeEventListener("fullscreenchange", onFullscreenChange);
@@ -304,12 +295,6 @@ export default function LivePlayer({
 
 	// ── Video controls ────────────────────────────────────────────────────────
 
-	const togglePlay = () => {
-		const video = videoRef.current;
-		if (!video) return;
-		if (video.paused) void video.play(); else video.pause();
-	};
-
 	const toggleMute = () => {
 		const video = videoRef.current;
 		if (!video) return;
@@ -360,7 +345,6 @@ export default function LivePlayer({
 			<video
 				ref={videoRef}
 				autoPlay
-				onClick={togglePlay}
 				className="h-screen w-screen bg-black object-contain"
 			/>
 
@@ -415,18 +399,9 @@ export default function LivePlayer({
 			{/* Bottom bar */}
 			<div className={`${overlay} bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-5 pb-5 pt-12`}>
 				<div className="flex flex-wrap items-center justify-between gap-4">
-					<div className="flex items-center gap-3">
-						<button
-							type="button"
-							onClick={togglePlay}
-							className="rounded-full bg-secondary-400 p-3 text-dark transition-colors hover:bg-secondary"
-						>
-							{isPaused ? <PlayIcon className="h-6 w-6" /> : <PauseIcon className="h-6 w-6" />}
-						</button>
-						<div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5">
-							<span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-							<span className="text-xs font-semibold uppercase tracking-wide text-white">Live</span>
-						</div>
+					<div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5">
+						<span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+						<span className="text-xs font-semibold uppercase tracking-wide text-white">Live</span>
 					</div>
 
 					<div className="flex items-center gap-3">
