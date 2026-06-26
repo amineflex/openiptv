@@ -2,15 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeftIcon, PlayIcon } from "@heroicons/react/24/outline";
 import FavouriteButton from "../components/FavouriteButton";
+import DownloadButton from "../components/DownloadButton";
 import NotFound from "../components/NotFound";
 import StarRating from "../components/StarRating";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
 import { formatReleaseDate, getReleaseYear } from "../services/dateService";
 import { generateStreamUrl } from "../services/streamService";
+import { buildDownloadId } from "../services/downloadsService";
 import { extractSubtitleTracks } from "../services/subtitleService";
 import { buildWatchRoute } from "../services/watchRoute";
-import type { VodInfo } from "../types";
+import type { DownloadStartInput, VodInfo } from "../types";
 import { PLACEHOLDER_POSTER } from "../constants";
 
 export default function Movie() {
@@ -127,6 +129,22 @@ export default function Movie() {
 		category: movieInfo.info.genre,
 		icon: movieInfo.info.movie_image
 	});
+	const downloadItem: DownloadStartInput = {
+		id: buildDownloadId(stream.id, "movie", movieId),
+		streamId: stream.id,
+		kind: "movie",
+		title: movieName,
+		subtitle: movieInfo.info.genre,
+		image: movieInfo.info.movie_image || movieInfo.info.cover_big,
+		url: streamUrl,
+		container: movieInfo.movie_data?.container_extension || "mp4",
+		route: `/menu/${id}/movies/v/${movieId}`,
+		subtitles: subtitles.map((track) => ({
+			language: track.language,
+			label: track.label,
+			url: track.src
+		}))
+	};
 	const favouriteItem = {
 		id: movieId,
 		streamId: stream.id,
@@ -199,6 +217,7 @@ export default function Movie() {
 								Watch Now
 							</Link>
 							<FavouriteButton item={favouriteItem} />
+							<DownloadButton item={downloadItem} />
 						</div>
 
 						{movieInfo.info.plot && (

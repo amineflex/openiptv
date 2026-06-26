@@ -29,6 +29,35 @@ electron_1.contextBridge.exposeInMainWorld("openIptv", {
         return () => electron_1.ipcRenderer.removeListener("updater:downloaded", handler);
     },
     installUpdate: () => electron_1.ipcRenderer.invoke("updater:quit-and-install"),
+    // ── Downloads (offline, Netflix-style) ───────────────────────────────────────
+    // Media is fetched by the main process into <userData>/Downloads. The renderer
+    // drives it through these invokes and subscribes to progress/changed/removed
+    // events; every listener returns a cleanup function (call from useEffect).
+    downloads: {
+        list: () => electron_1.ipcRenderer.invoke("downloads:list"),
+        start: (input) => electron_1.ipcRenderer.invoke("downloads:start", input),
+        cancel: (id) => electron_1.ipcRenderer.invoke("downloads:cancel", id),
+        remove: (id) => electron_1.ipcRenderer.invoke("downloads:delete", id),
+        openFile: (id) => electron_1.ipcRenderer.invoke("downloads:open-file", id),
+        playback: (id) => electron_1.ipcRenderer.invoke("downloads:playback", id),
+        reveal: (id) => electron_1.ipcRenderer.invoke("downloads:reveal", id),
+        openFolder: () => electron_1.ipcRenderer.invoke("downloads:open-folder"),
+        onProgress: (cb) => {
+            const handler = (_e, progress) => cb(progress);
+            electron_1.ipcRenderer.on("downloads:progress", handler);
+            return () => electron_1.ipcRenderer.removeListener("downloads:progress", handler);
+        },
+        onChanged: (cb) => {
+            const handler = (_e, record) => cb(record);
+            electron_1.ipcRenderer.on("downloads:changed", handler);
+            return () => electron_1.ipcRenderer.removeListener("downloads:changed", handler);
+        },
+        onRemoved: (cb) => {
+            const handler = (_e, payload) => cb(payload);
+            electron_1.ipcRenderer.on("downloads:removed", handler);
+            return () => electron_1.ipcRenderer.removeListener("downloads:removed", handler);
+        }
+    },
     // Static — read once. process.platform/arch are available even in a
     // sandboxed preload; Node builtins like "os" are NOT (they crash the
     // whole preload and wipe out window.openIptv), so don't import them here.

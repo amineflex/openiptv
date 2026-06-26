@@ -19,7 +19,9 @@ function displayHost(domain: string): string {
 }
 
 const toneClasses: Record<ExpiryTone, string> = {
-	ok: "border-green-400/30 bg-green-400/10 text-green-300",
+	// "ok" is the common, calm state — keep it neutral so it doesn't fight the
+	// purple accent. Amber/red stay loud because they're rare, real warnings.
+	ok: "border-white/10 bg-white/5 text-secondary",
 	soon: "border-amber-400/30 bg-amber-400/10 text-amber-300",
 	expired: "border-red-400/30 bg-red-400/10 text-red-300",
 	unknown: "border-white/10 bg-white/5 text-secondary-700"
@@ -28,8 +30,11 @@ const toneClasses: Record<ExpiryTone, string> = {
 function expiryText(formatted: string, daysLeft: number | null, tone: ExpiryTone): string {
 	if (tone === "expired") return `Expired ${formatted}`;
 	if (tone === "unknown") return "Expiry unknown";
-	if (daysLeft === 0) return `${formatted} · today`;
-	return `${formatted} · ${daysLeft}d left`;
+	if (daysLeft === 0) return "Expires today";
+	// Only surface the countdown when it actually matters (≤ 7 days). Otherwise
+	// just the date — no "254d left" clutter.
+	if (tone === "soon") return `${daysLeft}d left · ${formatted}`;
+	return formatted;
 }
 
 export default function StreamCard({ stream, onEdit, onDelete }: StreamCardProps) {

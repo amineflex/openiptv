@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+	ArrowDownTrayIcon,
 	ArrowLeftIcon,
 	ArrowRightIcon,
 	ClockIcon,
@@ -128,6 +129,43 @@ export default function Menu() {
 		}
 	];
 
+	// Sidebar quick-links — one template renders all three, so they stay uniform
+	// by construction. Only the per-accent colour classes differ (kept as full
+	// literal strings so Tailwind picks them up).
+	const sideLinks: {
+		to: string;
+		label: string;
+		value: string;
+		icon: typeof TvIcon;
+		card: string;
+		chip: string;
+	}[] = [
+		{
+			to: "favourites",
+			label: "Favourites",
+			value: "Movies & series",
+			icon: HeartIcon,
+			card: "from-secondary-400/15 hover:border-secondary-400/50 hover:from-secondary-400/25 focus:ring-secondary-400",
+			chip: "bg-secondary-400/15 text-secondary-400 group-hover:bg-secondary-400 group-hover:text-dark"
+		},
+		{
+			to: "history",
+			label: "History",
+			value: "Recently watched",
+			icon: ClockIcon,
+			card: "from-sky-400/15 hover:border-sky-400/50 hover:from-sky-400/25 focus:ring-sky-400",
+			chip: "bg-sky-400/15 text-sky-300 group-hover:bg-sky-400 group-hover:text-dark"
+		},
+		{
+			to: "downloads",
+			label: "Downloads",
+			value: "Watch offline",
+			icon: ArrowDownTrayIcon,
+			card: "from-emerald-400/15 hover:border-emerald-400/50 hover:from-emerald-400/25 focus:ring-emerald-400",
+			chip: "bg-emerald-400/15 text-emerald-300 group-hover:bg-emerald-400 group-hover:text-dark"
+		}
+	];
+
 	return (
 		<div className="relative min-h-screen overflow-hidden bg-dark text-secondary">
 			{/* Ambient blobs — scaled up on large screens */}
@@ -137,7 +175,7 @@ export default function Menu() {
 			</div>
 
 			{/* Content — wider container on 2K/4K */}
-			<div className="fade-in relative mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-7 2xl:max-w-[112rem] 2xl:px-12">
+			<div className="fade-in relative mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-7 2xl:max-w-[112rem] 2xl:px-12 min-[2560px]:max-w-[160rem] min-[2560px]:px-16">
 
 				<header className="flex flex-col gap-5 border-b border-white/10 pb-6 md:flex-row md:items-center md:justify-between">
 					<div className="min-w-0">
@@ -172,7 +210,7 @@ export default function Menu() {
 					  - 2xl: 2 columns, 2 rows — Live TV spans both rows on the left;
 					         Movies (row 1) and Series (row 2) stack on the right
 				*/}
-				<main className="grid flex-1 gap-6 py-8 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_460px]">
+				<main className="grid flex-1 gap-6 py-8 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_460px] min-[2560px]:grid-cols-[1fr_600px] min-[2560px]:gap-10">
 
 					<section className="grid auto-rows-fr gap-4 md:grid-cols-3 2xl:grid-cols-2 2xl:grid-rows-2">
 						{menuItems.map(({ title, description, to, accent, icon: Icon }, index) => (
@@ -206,66 +244,46 @@ export default function Menu() {
 						))}
 					</section>
 
-					<aside className="flex flex-col gap-4">
+					<aside className="flex flex-col gap-4 2xl:gap-5">
 						<Link
 							to="account"
-							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-6"
+							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-7 min-[2560px]:p-9"
 						>
 							<div className="flex items-center gap-3">
-								<UserCircleIcon className="h-9 w-9 flex-none text-secondary-400 transition group-hover:text-secondary 2xl:h-11 2xl:w-11" />
+								<UserCircleIcon className="h-9 w-9 flex-none text-secondary-400 transition group-hover:text-secondary 2xl:h-11 2xl:w-11 min-[2560px]:h-14 min-[2560px]:w-14" />
 								<div className="min-w-0">
-									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Connected as</p>
-									<p className="truncate text-lg font-bold text-white 2xl:text-xl">{stream.username}</p>
+									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700 min-[2560px]:text-sm">Connected as</p>
+									<p className="truncate text-lg font-bold text-white 2xl:text-xl min-[2560px]:text-2xl">{stream.username}</p>
+								</div>
+							</div>
+							<div className="mt-4 flex items-center gap-3 border-t border-white/10 pt-4 min-[2560px]:mt-6 min-[2560px]:pt-6">
+								<CalendarDaysIcon className="h-9 w-9 flex-none text-secondary-400 transition group-hover:text-secondary 2xl:h-11 2xl:w-11 min-[2560px]:h-14 min-[2560px]:w-14" />
+								<div className="min-w-0">
+									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700 min-[2560px]:text-sm">Subscription ends</p>
+									<p className="truncate text-lg font-bold text-white 2xl:text-xl min-[2560px]:text-2xl">{expirationDate}</p>
 								</div>
 							</div>
 						</Link>
 
-						<Link
-							to="account"
-							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-6"
-						>
-							<div className="flex items-center gap-3">
-								<CalendarDaysIcon className="h-9 w-9 flex-none text-secondary-400 transition group-hover:text-secondary 2xl:h-11 2xl:w-11" />
-								<div>
-									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Subscription ends</p>
-									<p className="text-lg font-bold text-white 2xl:text-xl">{expirationDate}</p>
-								</div>
-							</div>
-						</Link>
-
-						<Link
-							to="favourites"
-							className="group rounded-2xl border border-white/10 bg-gradient-to-br from-secondary-400/15 to-transparent p-8 backdrop-blur transition hover:border-secondary-400/50 hover:from-secondary-400/25 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-6"
-						>
-							<div className="flex items-center gap-3">
-								<span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-secondary-400/15 text-secondary-400 transition group-hover:bg-secondary-400 group-hover:text-dark 2xl:h-12 2xl:w-12">
-									<HeartIcon className="h-6 w-6 2xl:h-7 2xl:w-7" />
+						{sideLinks.map(({ to, label, value, icon: Icon, card, chip }) => (
+							<Link
+								key={to}
+								to={to}
+								className={`group flex items-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-br to-transparent p-6 backdrop-blur transition focus:outline-none focus:ring-2 2xl:gap-4 2xl:p-7 min-[2560px]:gap-5 min-[2560px]:p-9 ${card}`}
+							>
+								<span className={`flex h-11 w-11 flex-none items-center justify-center rounded-xl transition 2xl:h-12 2xl:w-12 min-[2560px]:h-16 min-[2560px]:w-16 ${chip}`}>
+									<Icon className="h-6 w-6 2xl:h-7 2xl:w-7 min-[2560px]:h-9 min-[2560px]:w-9" />
 								</span>
-								<div>
-									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">Favourites</p>
-									<p className="text-lg font-bold text-white 2xl:text-xl">Movies &amp; series</p>
+								<div className="min-w-0">
+									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700 min-[2560px]:text-sm">{label}</p>
+									<p className="truncate text-lg font-bold text-white 2xl:text-xl min-[2560px]:text-2xl">{value}</p>
 								</div>
-							</div>
-						</Link>
-
-						<Link
-							to="history"
-							className="group rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/15 to-transparent p-8 backdrop-blur transition hover:border-sky-400/50 hover:from-sky-400/25 focus:outline-none focus:ring-2 focus:ring-sky-400 2xl:p-6"
-						>
-							<div className="flex items-center gap-3">
-								<span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-sky-400/15 text-sky-300 transition group-hover:bg-sky-400 group-hover:text-dark 2xl:h-12 2xl:w-12">
-									<ClockIcon className="h-6 w-6 2xl:h-7 2xl:w-7" />
-								</span>
-								<div>
-									<p className="text-xs font-semibold uppercase tracking-wide text-secondary-700">History</p>
-									<p className="text-lg font-bold text-white 2xl:text-xl">Recently watched</p>
-								</div>
-							</div>
-						</Link>
+							</Link>
+						))}
 
 						<Link
 							to="/"
-							className="mt-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-secondary transition hover:border-secondary-400/50 hover:bg-secondary-400 hover:text-dark 2xl:py-4 2xl:text-base"
+							className="mt-auto inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-secondary transition hover:border-secondary-400/50 hover:bg-secondary-400 hover:text-dark 2xl:py-4 2xl:text-base min-[2560px]:py-5 min-[2560px]:text-lg"
 						>
 							<ArrowLeftIcon className="h-5 w-5" />
 							Back to profiles

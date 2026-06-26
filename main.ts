@@ -6,15 +6,25 @@ import started from "electron-squirrel-startup";
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 if (started) { process.exit(0); }
 
-import { app, autoUpdater, BrowserWindow, ipcMain } from "electron";
+import { app, autoUpdater, BrowserWindow, ipcMain, shell } from "electron";
 import path from "path";
-import { existsSync } from "fs";
+import { existsSync, createWriteStream, writeFileSync, createReadStream, statSync } from "fs";
+import { mkdir, readFile, rename, unlink, writeFile } from "fs/promises";
 import { spawn, spawnSync } from "child_process";
 import http from "http";
 import https from "https";
 import type { IncomingHttpHeaders, ServerResponse } from "http";
 import { randomUUID } from "crypto";
 import { createLogger } from "./src/services/logger";
+import type {
+	DownloadActionResult,
+	DownloadPlaybackResult,
+	DownloadProgress,
+	DownloadRecord,
+	DownloadStartInput,
+	DownloadSubtitleFile,
+	DownloadSubtitleInput
+} from "./src/types";
 
 // ── Binary resolution ─────────────────────────────────────────────────────────
 // Electron GUI apps launched from Finder/Dock on macOS (and some Linux DEs) get
@@ -280,6 +290,7 @@ ipcMain.handle("updater:quit-and-install", () => {
 app.whenReady()
 	.then(() => {
 		logger.info("Electron app is ready");
+		void loadDownloadsManifest();
 		createWindow();
 		setupAutoUpdater();
 
@@ -1060,6 +1071,14 @@ function ensureTranscodeServer(): Promise<number> {
 				handleStreamProxyRequest(request, response, requestUrl);
 				return;
 			}
+			if (requestUrl.pathname.startsWith("/download-sub/")) {
+				handleDownloadSubtitleRequest(request, response, requestUrl);
+				return;
+			}
+			if (requestUrl.pathname.startsWith("/download/")) {
+				handleDownloadFileRequest(request, response, requestUrl);
+				return;
+			}
 
 			const match = requestUrl.pathname.match(/^\/transcode\/([^/]+)$/);
 			const startTime = Math.max(0, Number(requestUrl.searchParams.get("start") ?? 0) || 0);
@@ -1838,6 +1857,565 @@ ipcMain.handle("stats:get-app-usage", () => getAppUsageStats());
 ipcMain.handle("stats:get-system", () => getAppUsageStats());
 ipcMain.handle("stats:get-ffmpeg", () => getFfmpegServerStats());
 
+// ── Downloads (offline, Netflix-style) ────────────────────────────────────────
+// Media is saved under <userData>/Downloads so it lives in the OS app-data dir
+// (and survives app updates). A small JSON manifest in userData tracks each
+// download's metadata + status, so the UI can show live progress and an
+// "already downloaded" state across restarts. The raw VOD/episode file is saved
+// as-is (no transcoding) — exactly the container the server serves.
+
+const DOWNLOADS_DIR = path.join(app.getPath("userData"), "Downloads");
+const DOWNLOADS_MANIFEST = path.join(app.getPath("userData"), "downloads.json");
+const MAX_DOWNLOAD_REDIRECTS = 5;
+const DOWNLOAD_PROGRESS_INTERVAL_MS = 400;
+// Some IPTV servers gate VOD on a non-empty User-Agent; mimic a desktop client.
+const DOWNLOAD_USER_AGENT =
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
+interface ActiveDownload {
+	partPath: string;
+	canceled: boolean;
+	cancel: () => void;
+}
+
+const downloadRecords = new Map<string, DownloadRecord>();
+const activeDownloads = new Map<string, ActiveDownload>();
+let manifestWriteTimer: NodeJS.Timeout | null = null;
+
+function broadcast(channel: string, payload: unknown): void {
+	for (const win of BrowserWindow.getAllWindows()) {
+		win.webContents.send(channel, payload);
+	}
+}
+
+// Strip characters illegal on Windows/macOS/Linux filesystems and trailing dots.
+function sanitizeSegment(value: string): string {
+	// Drop control characters (charCode < 0x20) first — done in a loop rather
+	// than a control-char regex literal, which ESLint's no-control-regex forbids.
+	let stripped = "";
+	for (const char of value) {
+		stripped += char.charCodeAt(0) < 0x20 ? " " : char;
+	}
+	const cleaned = stripped
+		.replace(/[<>:"/\\|?*]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+		.replace(/[. ]+$/, "");
+	return cleaned.slice(0, 120) || "untitled";
+}
+
+function buildDownloadFilePath(input: DownloadStartInput): string {
+	const ext = (input.container || "mp4").replace(/[^a-z0-9]/gi, "").toLowerCase() || "mp4";
+	if (input.kind === "episode") {
+		const series = sanitizeSegment(input.seriesTitle || input.title || "Series");
+		const season = sanitizeSegment(`Season ${input.season ?? "1"}`);
+		const epNum =
+			input.episodeNum !== undefined ? `E${String(input.episodeNum).padStart(2, "0")} - ` : "";
+		const file = sanitizeSegment(`${epNum}${input.title || "Episode"}`);
+		return path.join(DOWNLOADS_DIR, "Series", series, season, `${file}.${ext}`);
+	}
+	const file = sanitizeSegment(input.title || "Movie");
+	return path.join(DOWNLOADS_DIR, "Movies", `${file}.${ext}`);
+}
+
+const CONTENT_TYPES: Record<string, string> = {
+	mp4: "video/mp4",
+	m4v: "video/mp4",
+	mkv: "video/x-matroska",
+	webm: "video/webm",
+	ts: "video/mp2t",
+	mpg: "video/mpeg",
+	mpeg: "video/mpeg",
+	avi: "video/x-msvideo",
+	mov: "video/quicktime",
+	wmv: "video/x-ms-wmv",
+	flv: "video/x-flv",
+	vtt: "text/vtt",
+	srt: "application/x-subrip",
+	ass: "text/plain",
+	ssa: "text/plain",
+	sub: "text/plain"
+};
+
+function contentTypeForPath(filePath: string): string {
+	const ext = path.extname(filePath).slice(1).toLowerCase();
+	return CONTENT_TYPES[ext] ?? "application/octet-stream";
+}
+
+// Serve a local file over the media server with HTTP Range support, so the
+// renderer's <video> (and ffmpeg, when it transcodes) can seek into downloads
+// exactly like a remote stream.
+function serveStaticFile(
+	request: http.IncomingMessage,
+	response: ServerResponse,
+	filePath: string
+): void {
+	let fileSize: number;
+	try {
+		fileSize = statSync(filePath).size;
+	} catch {
+		response.writeHead(404);
+		response.end();
+		return;
+	}
+
+	const headers: Record<string, string> = {
+		"Access-Control-Allow-Origin": "*",
+		"Accept-Ranges": "bytes",
+		"Content-Type": contentTypeForPath(filePath),
+		"Cache-Control": "no-store"
+	};
+
+	if (request.method === "HEAD") {
+		response.writeHead(200, { ...headers, "Content-Length": String(fileSize) });
+		response.end();
+		return;
+	}
+
+	const rangeMatch = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range ?? "");
+	if (rangeMatch) {
+		let start = rangeMatch[1] ? Number(rangeMatch[1]) : 0;
+		let end = rangeMatch[2] ? Number(rangeMatch[2]) : fileSize - 1;
+		if (!Number.isFinite(start)) start = 0;
+		if (!Number.isFinite(end) || end >= fileSize) end = fileSize - 1;
+		if (start > end || start >= fileSize) {
+			response.writeHead(416, { ...headers, "Content-Range": `bytes */${fileSize}` });
+			response.end();
+			return;
+		}
+		response.writeHead(206, {
+			...headers,
+			"Content-Range": `bytes ${start}-${end}/${fileSize}`,
+			"Content-Length": String(end - start + 1)
+		});
+		const stream = createReadStream(filePath, { start, end });
+		stream.on("error", () => response.destroy());
+		response.on("close", () => stream.destroy());
+		stream.pipe(response);
+		return;
+	}
+
+	response.writeHead(200, { ...headers, "Content-Length": String(fileSize) });
+	const stream = createReadStream(filePath);
+	stream.on("error", () => response.destroy());
+	response.on("close", () => stream.destroy());
+	stream.pipe(response);
+}
+
+function handleDownloadFileRequest(
+	request: http.IncomingMessage,
+	response: ServerResponse,
+	requestUrl: URL
+): void {
+	const id = decodeURIComponent(requestUrl.pathname.slice("/download/".length));
+	const record = downloadRecords.get(id);
+	if (!record || record.status !== "completed" || !existsSync(record.filePath)) {
+		response.writeHead(404);
+		response.end();
+		return;
+	}
+	serveStaticFile(request, response, record.filePath);
+}
+
+function handleDownloadSubtitleRequest(
+	request: http.IncomingMessage,
+	response: ServerResponse,
+	requestUrl: URL
+): void {
+	const [rawId, rawIndex] = requestUrl.pathname.slice("/download-sub/".length).split("/");
+	const record = downloadRecords.get(decodeURIComponent(rawId ?? ""));
+	const sub = record?.subtitles?.[Number(rawIndex)];
+	if (!sub || !existsSync(sub.filePath)) {
+		response.writeHead(404);
+		response.end();
+		return;
+	}
+	serveStaticFile(request, response, sub.filePath);
+}
+
+// Buffer a (small) URL fully into memory — used for subtitle sidecars, which are
+// tiny. Follows redirects the same way the proxy/video downloader does.
+function fetchUrlToBuffer(rawUrl: string, redirectCount = 0): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		let url: URL;
+		try {
+			url = new URL(rawUrl);
+		} catch {
+			reject(new Error("Invalid URL"));
+			return;
+		}
+		const transport = url.protocol === "https:" ? https : http;
+		const req = transport.request(
+			url,
+			{ method: "GET", headers: createForwardHeaders({ "user-agent": DOWNLOAD_USER_AGENT }, url) },
+			(res) => {
+				const status = res.statusCode ?? 0;
+				const location = res.headers.location;
+				if (location && [301, 302, 303, 307, 308].includes(status) && redirectCount < MAX_DOWNLOAD_REDIRECTS) {
+					res.resume();
+					fetchUrlToBuffer(new URL(location, url).toString(), redirectCount + 1).then(resolve, reject);
+					return;
+				}
+				if (status < 200 || status >= 300) {
+					res.resume();
+					reject(new Error(`HTTP ${status}`));
+					return;
+				}
+				const chunks: Buffer[] = [];
+				res.on("data", (chunk: Buffer) => chunks.push(chunk));
+				res.on("end", () => resolve(Buffer.concat(chunks)));
+				res.on("error", reject);
+			}
+		);
+		req.on("error", reject);
+		req.end();
+	});
+}
+
+function subtitleExtFromUrl(rawUrl: string): string {
+	try {
+		const match = new URL(rawUrl).pathname.toLowerCase().match(/\.(srt|vtt|ass|ssa|sub)$/);
+		if (match) return match[1];
+	} catch {
+		/* not a parseable URL — fall through */
+	}
+	return "srt";
+}
+
+// Fetch each external subtitle and save it as a sidecar named like the video
+// (`<base>.<lang>.<ext>`) so OS players auto-load it. Best-effort: a failed
+// subtitle is logged and skipped, never failing the (already saved) video.
+async function downloadSubtitlesFor(
+	record: DownloadRecord,
+	inputs: DownloadSubtitleInput[]
+): Promise<void> {
+	if (!inputs.length) return;
+
+	const base = record.filePath.replace(/\.[^/.\\]+$/, "");
+	const saved: DownloadSubtitleFile[] = [];
+	const usedPaths = new Set<string>();
+
+	for (const sub of inputs) {
+		try {
+			const lang = (sub.language || "und").replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 8) || "und";
+			const ext = subtitleExtFromUrl(sub.url);
+			let target = `${base}.${lang}.${ext}`;
+			for (let n = 2; usedPaths.has(target); n++) target = `${base}.${lang}.${n}.${ext}`;
+			usedPaths.add(target);
+
+			const buffer = await fetchUrlToBuffer(sub.url);
+			await writeFile(target, buffer);
+			saved.push({ language: sub.language, label: sub.label, filePath: target });
+		} catch (err) {
+			logger.warn("Failed to download subtitle", { url: sub.url, error: String(err) });
+		}
+	}
+
+	if (saved.length) {
+		record.subtitles = saved;
+		emitChanged(record);
+	}
+}
+
+function scheduleManifestSave(): void {
+	if (manifestWriteTimer) return;
+	manifestWriteTimer = setTimeout(() => {
+		manifestWriteTimer = null;
+		void writeFile(DOWNLOADS_MANIFEST, JSON.stringify([...downloadRecords.values()], null, 2)).catch(
+			(err) => logger.warn("Failed to persist downloads manifest", { error: String(err) })
+		);
+	}, 250);
+	manifestWriteTimer.unref();
+}
+
+async function loadDownloadsManifest(): Promise<void> {
+	try {
+		const raw = await readFile(DOWNLOADS_MANIFEST, "utf8");
+		const parsed = JSON.parse(raw) as DownloadRecord[];
+		if (!Array.isArray(parsed)) return;
+		for (const record of parsed) {
+			if (!record || typeof record.id !== "string") continue;
+			// Anything still "in-flight" was cut short by a previous quit/crash.
+			if (record.status === "downloading" || record.status === "queued") {
+				record.status = "error";
+				record.error = "Interrupted";
+			}
+			downloadRecords.set(record.id, record);
+		}
+		logger.info("Loaded downloads manifest", { count: downloadRecords.size });
+	} catch {
+		/* no manifest yet — first run */
+	}
+}
+
+function emitChanged(record: DownloadRecord): void {
+	scheduleManifestSave();
+	broadcast("downloads:changed", record);
+}
+
+function startDownload(record: DownloadRecord, subtitleInputs: DownloadSubtitleInput[] = []): void {
+	const partPath = `${record.filePath}.part`;
+	const active: ActiveDownload = { partPath, canceled: false, cancel: () => undefined };
+	activeDownloads.set(record.id, active);
+
+	let request: http.ClientRequest | null = null;
+	let fileStream: ReturnType<typeof createWriteStream> | null = null;
+	let settled = false;
+
+	const fail = (message: string) => {
+		if (settled) return;
+		settled = true;
+		activeDownloads.delete(record.id);
+		try { fileStream?.destroy(); } catch { /* already closed */ }
+		try { request?.destroy(); } catch { /* already closed */ }
+		void unlink(partPath).catch(() => { /* part may not exist */ });
+		record.status = active.canceled ? "canceled" : "error";
+		record.error = active.canceled ? undefined : message;
+		emitChanged(record);
+	};
+
+	const complete = () => {
+		if (settled) return;
+		settled = true;
+		activeDownloads.delete(record.id);
+		void rename(partPath, record.filePath)
+			.then(() => {
+				record.status = "completed";
+				record.completedAt = new Date().toISOString();
+				if (!record.total) record.total = record.received;
+				emitChanged(record);
+				// Pull subtitle sidecars after the video lands (best-effort).
+				void downloadSubtitlesFor(record, subtitleInputs);
+			})
+			.catch((err: unknown) => {
+				record.status = "error";
+				record.error = err instanceof Error ? err.message : String(err);
+				void unlink(partPath).catch(() => undefined);
+				emitChanged(record);
+			});
+	};
+
+	active.cancel = () => {
+		active.canceled = true;
+		fail("Canceled");
+	};
+
+	void mkdir(path.dirname(record.filePath), { recursive: true })
+		.then(() => {
+			if (active.canceled) return;
+
+			fileStream = createWriteStream(partPath);
+			fileStream.on("error", (err) => fail(err.message));
+			fileStream.on("finish", complete);
+
+			let lastEmit = 0;
+			let lastBytes = 0;
+			let lastBytesTime = Date.now();
+
+			const open = (sourceUrl: string, redirectCount: number) => {
+				if (active.canceled) return;
+
+				let remoteUrl: URL;
+				try {
+					remoteUrl = new URL(sourceUrl);
+				} catch {
+					fail("Invalid URL");
+					return;
+				}
+
+				const transport = remoteUrl.protocol === "https:" ? https : http;
+				request = transport.request(
+					remoteUrl,
+					{
+						method: "GET",
+						headers: createForwardHeaders({ "user-agent": DOWNLOAD_USER_AGENT }, remoteUrl)
+					},
+					(res) => {
+						const statusCode = res.statusCode ?? 0;
+						const location = res.headers.location;
+
+						if (
+							location
+							&& [301, 302, 303, 307, 308].includes(statusCode)
+							&& redirectCount < MAX_DOWNLOAD_REDIRECTS
+						) {
+							res.resume();
+							open(new URL(location, remoteUrl).toString(), redirectCount + 1);
+							return;
+						}
+
+						if (statusCode < 200 || statusCode >= 300) {
+							res.resume();
+							fail(`HTTP ${statusCode}`);
+							return;
+						}
+
+						record.total = Number(res.headers["content-length"]) || 0;
+						record.status = "downloading";
+						emitChanged(record);
+
+						res.on("data", (chunk: Buffer) => {
+							record.received += chunk.length;
+							const now = Date.now();
+							if (now - lastEmit < DOWNLOAD_PROGRESS_INTERVAL_MS) return;
+
+							const secs = (now - lastBytesTime) / 1000;
+							const bytesPerSecond = secs > 0 ? (record.received - lastBytes) / secs : 0;
+							lastEmit = now;
+							lastBytes = record.received;
+							lastBytesTime = now;
+							broadcast("downloads:progress", {
+								id: record.id,
+								received: record.received,
+								total: record.total,
+								percent: record.total > 0 ? Math.min(100, (record.received / record.total) * 100) : -1,
+								bytesPerSecond
+							} satisfies DownloadProgress);
+						});
+						res.on("error", (err) => fail(err.message));
+						if (fileStream) res.pipe(fileStream);
+					}
+				);
+
+				request.on("error", (err) => fail(err.message));
+				request.end();
+			};
+
+			open(record.url, 0);
+		})
+		.catch((err: unknown) => fail(err instanceof Error ? err.message : String(err)));
+}
+
+ipcMain.handle("downloads:list", (): DownloadRecord[] => [...downloadRecords.values()]);
+
+ipcMain.handle("downloads:start", (_event, input: DownloadStartInput): DownloadActionResult => {
+	if (!input || typeof input.id !== "string" || typeof input.url !== "string") {
+		return { ok: false, error: "Invalid download request" };
+	}
+
+	// Already running, or already on disk — hand back the current record.
+	if (activeDownloads.has(input.id)) {
+		return { ok: true, record: downloadRecords.get(input.id) };
+	}
+	const existing = downloadRecords.get(input.id);
+	if (existing && existing.status === "completed" && existsSync(existing.filePath)) {
+		return { ok: true, record: existing };
+	}
+
+	let url: string;
+	try {
+		url = assertHttpUrl(input.url);
+	} catch {
+		return { ok: false, error: "Invalid URL" };
+	}
+
+	const record: DownloadRecord = {
+		id: input.id,
+		streamId: input.streamId,
+		kind: input.kind,
+		title: input.title,
+		subtitle: input.subtitle,
+		image: input.image,
+		url,
+		container: input.container,
+		filePath: buildDownloadFilePath(input),
+		status: "queued",
+		received: 0,
+		total: 0,
+		createdAt: new Date().toISOString(),
+		seriesId: input.seriesId,
+		seriesTitle: input.seriesTitle,
+		season: input.season,
+		episodeNum: input.episodeNum,
+		route: input.route,
+		subtitleSources: input.subtitles
+	};
+	downloadRecords.set(record.id, record);
+	emitChanged(record);
+	startDownload(record, input.subtitles ?? []);
+	return { ok: true, record };
+});
+
+ipcMain.handle("downloads:cancel", (_event, id: unknown): DownloadActionResult => {
+	if (typeof id !== "string") return { ok: false };
+	activeDownloads.get(id)?.cancel();
+	return { ok: true, record: downloadRecords.get(id) };
+});
+
+ipcMain.handle("downloads:delete", async (_event, id: unknown): Promise<DownloadActionResult> => {
+	if (typeof id !== "string") return { ok: false };
+	activeDownloads.get(id)?.cancel();
+
+	const record = downloadRecords.get(id);
+	if (record) {
+		await unlink(record.filePath).catch(() => undefined);
+		await unlink(`${record.filePath}.part`).catch(() => undefined);
+		for (const sub of record.subtitles ?? []) {
+			await unlink(sub.filePath).catch(() => undefined);
+		}
+		downloadRecords.delete(id);
+		scheduleManifestSave();
+		broadcast("downloads:removed", { id });
+	}
+	return { ok: true };
+});
+
+// Resolve a completed download to localhost URLs (video + subtitle sidecars) so
+// it can be played inside the app's own player, through the same pipeline as a
+// remote stream (audio transcode, seeking, subtitle rendering all reused).
+ipcMain.handle("downloads:playback", async (_event, id: unknown): Promise<DownloadPlaybackResult> => {
+	if (typeof id !== "string") return { ok: false, error: "Invalid id" };
+	const record = downloadRecords.get(id);
+	if (!record || record.status !== "completed" || !existsSync(record.filePath)) {
+		return { ok: false, error: "Download not available" };
+	}
+
+	let port: number;
+	try {
+		port = await ensureTranscodeServer();
+	} catch {
+		return { ok: false, error: "Local media server failed to start" };
+	}
+
+	const base = `http://127.0.0.1:${port}`;
+	const subtitles = (record.subtitles ?? []).map((sub, index) => ({
+		id: `download-sub:${id}:${index}`,
+		label: sub.label,
+		language: sub.language,
+		src: `${base}/download-sub/${encodeURIComponent(id)}/${index}`
+	}));
+
+	return { ok: true, url: `${base}/download/${encodeURIComponent(id)}`, subtitles };
+});
+
+ipcMain.handle("downloads:open-file", async (_event, id: unknown): Promise<DownloadActionResult> => {
+	if (typeof id !== "string") return { ok: false };
+	const record = downloadRecords.get(id);
+	if (!record || !existsSync(record.filePath)) return { ok: false, error: "File not found" };
+	const err = await shell.openPath(record.filePath);
+	return { ok: !err, error: err || undefined };
+});
+
+ipcMain.handle("downloads:reveal", async (_event, id: unknown): Promise<DownloadActionResult> => {
+	if (typeof id === "string") {
+		const record = downloadRecords.get(id);
+		if (record && existsSync(record.filePath)) {
+			shell.showItemInFolder(record.filePath);
+			return { ok: true };
+		}
+	}
+	// Fall back to the Downloads root if the specific file is gone.
+	await mkdir(DOWNLOADS_DIR, { recursive: true }).catch(() => undefined);
+	const err = await shell.openPath(DOWNLOADS_DIR);
+	return { ok: !err, error: err || undefined };
+});
+
+ipcMain.handle("downloads:open-folder", async (): Promise<DownloadActionResult> => {
+	await mkdir(DOWNLOADS_DIR, { recursive: true }).catch(() => undefined);
+	const err = await shell.openPath(DOWNLOADS_DIR);
+	return { ok: !err, error: err || undefined };
+});
+
 app.on("before-quit", () => {
 	logger.info("Electron app is quitting");
 	killAllTranscodes();
@@ -1847,4 +2425,13 @@ app.on("before-quit", () => {
 	transcodeServer?.close();
 	transcodeServer = null;
 	transcodeServerPort = null;
+
+	// Tear down in-flight downloads and flush the manifest synchronously — the
+	// debounced async save won't survive the quit.
+	for (const active of [...activeDownloads.values()]) active.cancel();
+	try {
+		writeFileSync(DOWNLOADS_MANIFEST, JSON.stringify([...downloadRecords.values()], null, 2));
+	} catch {
+		/* best-effort */
+	}
 });

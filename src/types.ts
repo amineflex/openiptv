@@ -293,6 +293,103 @@ export interface StreamInfoResult {
 	error?: string;
 }
 
+// ── Downloads (offline, Netflix-style) ───────────────────────────────────────
+export type DownloadKind = "movie" | "episode";
+export type DownloadStatus =
+	| "queued"
+	| "downloading"
+	| "completed"
+	| "error"
+	| "canceled";
+
+// An external subtitle track to fetch as a sidecar file (matched to the video's
+// base name so OS players auto-load it).
+export interface DownloadSubtitleInput {
+	language: string;
+	label: string;
+	url: string;
+}
+
+export interface DownloadSubtitleFile {
+	language: string;
+	label: string;
+	filePath: string;
+}
+
+export interface DownloadRecord {
+	// Deterministic id (`${streamId}:${kind}:${contentId}`) so re-opening a title
+	// resolves to the same record and shows its "already downloaded" state.
+	id: string;
+	streamId: string;
+	kind: DownloadKind;
+	title: string;
+	subtitle?: string;
+	image?: string;
+	url: string;
+	container: string;
+	filePath: string;
+	status: DownloadStatus;
+	received: number;
+	total: number;
+	error?: string;
+	createdAt: string;
+	completedAt?: string;
+	// Series grouping (only set for episodes).
+	seriesId?: string;
+	seriesTitle?: string;
+	season?: string;
+	episodeNum?: string | number;
+	// Detail-page route so the Downloads UI can jump back to the source.
+	route?: string;
+	// Subtitle URLs we were asked to fetch (kept for retry) and the sidecar files
+	// we actually saved next to the video.
+	subtitleSources?: DownloadSubtitleInput[];
+	subtitles?: DownloadSubtitleFile[];
+}
+
+// Everything the renderer hands to the main process to begin a download. The
+// main process derives `filePath` from this and owns the resulting record.
+export interface DownloadStartInput {
+	id: string;
+	streamId: string;
+	kind: DownloadKind;
+	title: string;
+	subtitle?: string;
+	image?: string;
+	url: string;
+	container: string;
+	seriesId?: string;
+	seriesTitle?: string;
+	season?: string;
+	episodeNum?: string | number;
+	route?: string;
+	subtitles?: DownloadSubtitleInput[];
+}
+
+export interface DownloadProgress {
+	id: string;
+	received: number;
+	total: number;
+	// 0–100, or -1 when the server didn't advertise a Content-Length.
+	percent: number;
+	bytesPerSecond: number;
+}
+
+export interface DownloadActionResult {
+	ok: boolean;
+	record?: DownloadRecord;
+	error?: string;
+}
+
+// Resolved local-playback handles: a localhost URL for the saved video plus any
+// sidecar subtitle tracks, both served by the app's media server.
+export interface DownloadPlaybackResult {
+	ok: boolean;
+	url?: string;
+	subtitles?: SubtitleTrack[];
+	error?: string;
+}
+
 export interface AppProcessUsage {
 	pid: number;
 	type: string;

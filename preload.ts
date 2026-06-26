@@ -68,6 +68,37 @@ contextBridge.exposeInMainWorld("openIptv", {
 	installUpdate: () =>
 		ipcRenderer.invoke("updater:quit-and-install"),
 
+	// ── Downloads (offline, Netflix-style) ───────────────────────────────────────
+	// Media is fetched by the main process into <userData>/Downloads. The renderer
+	// drives it through these invokes and subscribes to progress/changed/removed
+	// events; every listener returns a cleanup function (call from useEffect).
+	downloads: {
+		list: () => ipcRenderer.invoke("downloads:list"),
+		start: (input: unknown) => ipcRenderer.invoke("downloads:start", input),
+		cancel: (id: string) => ipcRenderer.invoke("downloads:cancel", id),
+		remove: (id: string) => ipcRenderer.invoke("downloads:delete", id),
+		openFile: (id: string) => ipcRenderer.invoke("downloads:open-file", id),
+		playback: (id: string) => ipcRenderer.invoke("downloads:playback", id),
+		reveal: (id: string) => ipcRenderer.invoke("downloads:reveal", id),
+		openFolder: () => ipcRenderer.invoke("downloads:open-folder"),
+
+		onProgress: (cb: (progress: unknown) => void) => {
+			const handler = (_e: Electron.IpcRendererEvent, progress: unknown) => cb(progress);
+			ipcRenderer.on("downloads:progress", handler);
+			return () => ipcRenderer.removeListener("downloads:progress", handler);
+		},
+		onChanged: (cb: (record: unknown) => void) => {
+			const handler = (_e: Electron.IpcRendererEvent, record: unknown) => cb(record);
+			ipcRenderer.on("downloads:changed", handler);
+			return () => ipcRenderer.removeListener("downloads:changed", handler);
+		},
+		onRemoved: (cb: (payload: { id: string }) => void) => {
+			const handler = (_e: Electron.IpcRendererEvent, payload: { id: string }) => cb(payload);
+			ipcRenderer.on("downloads:removed", handler);
+			return () => ipcRenderer.removeListener("downloads:removed", handler);
+		}
+	},
+
 	// Static — read once. process.platform/arch are available even in a
 	// sandboxed preload; Node builtins like "os" are NOT (they crash the
 	// whole preload and wipe out window.openIptv), so don't import them here.

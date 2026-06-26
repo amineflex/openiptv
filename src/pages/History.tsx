@@ -4,6 +4,7 @@ import {
 	ArrowLeftIcon,
 	ClockIcon,
 	FilmIcon,
+	PlayIcon,
 	TrashIcon,
 	TvIcon,
 	VideoCameraIcon
@@ -187,30 +188,41 @@ export default function History() {
 						</div>
 					</div>
 				) : (
-					<div className="flex flex-wrap gap-4 py-8">
+					<div className="grid grid-cols-2 gap-x-4 gap-y-6 py-8 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
 						{visibleItems.map((item) => {
 							const TypeIcon = typeIcon[item.type];
+							const image = item.image || PLACEHOLDER_POSTER;
 							return (
-								<div key={item.key} className="group relative">
-									<Link
-										to={item.route}
-										state={{ profileId: id }}
-										style={{
-											backgroundImage: `url(${item.image || PLACEHOLDER_POSTER})`,
-											backgroundSize: "cover",
-											backgroundPosition: "center",
-											backgroundRepeat: "no-repeat",
-											height: "300px",
-											width: "200px"
-										}}
-										className="flex items-end overflow-hidden rounded-xl border-2 border-transparent bg-dark bg-cover bg-center transition-transform duration-300 hover:scale-105 hover:border-secondary-400/75"
-									>
-										<div className="w-full bg-gradient-to-t from-dark/90 to-transparent p-4 pt-10 duration-300 group-hover:from-dark">
-											<span className="mb-1 inline-flex items-center gap-1 rounded-full bg-dark/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-secondary-400">
+								<div key={item.key} className="group relative flex flex-col">
+									<Link to={item.route} state={{ profileId: id }} className="flex flex-col focus:outline-none">
+										<div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black transition duration-200 group-hover:border-secondary-400/60 group-hover:shadow-lg group-hover:shadow-black/40">
+											{/* Blurred fill behind a contained foreground so wide channel logos
+											    and tall movie posters both look intentional in the same tile. */}
+											<img
+												src={image}
+												alt=""
+												aria-hidden="true"
+												className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-xl"
+											/>
+											<img
+												src={image}
+												alt={item.title}
+												loading="lazy"
+												className="relative z-10 h-full w-full object-contain p-2"
+											/>
+
+											<span className="absolute left-2 top-2 z-20 inline-flex items-center gap-1 rounded-full bg-dark/70 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-secondary-400 backdrop-blur">
 												<TypeIcon className="h-3 w-3" />
 												{typeLabel[item.type]}
 											</span>
-											<h2 className="line-clamp-2 text-lg font-semibold text-white/90">{item.title}</h2>
+
+											<span className="absolute inset-0 z-20 flex items-center justify-center bg-black/0 transition duration-200 group-hover:bg-black/40">
+												<PlayIcon className="h-10 w-10 text-white opacity-0 transition duration-200 group-hover:opacity-100" />
+											</span>
+										</div>
+
+										<div className="mt-2.5 min-w-0">
+											<h2 className="line-clamp-1 text-sm font-semibold text-white" title={item.title}>{item.title}</h2>
 											{item.subtitle && (
 												<p className="line-clamp-1 text-xs text-secondary-700">{item.subtitle}</p>
 											)}
@@ -225,9 +237,9 @@ export default function History() {
 										type="button"
 										onClick={() => removeItem(item)}
 										title="Remove from history"
-										className="absolute right-2 top-2 rounded-full bg-dark/70 p-2 text-white opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-red-600"
+										className="absolute right-2 top-2 z-30 rounded-full bg-dark/70 p-1.5 text-white opacity-0 backdrop-blur transition hover:bg-red-600 group-hover:opacity-100"
 									>
-										<TrashIcon className="h-5 w-5" />
+										<TrashIcon className="h-4 w-4" />
 									</button>
 								</div>
 							);

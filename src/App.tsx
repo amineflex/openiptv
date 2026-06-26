@@ -11,6 +11,7 @@ import Watch from "./pages/Watch";
 import Settings from "./pages/Settings";
 import Favourites from "./pages/Favourites";
 import History from "./pages/History";
+import Downloads from "./pages/Downloads";
 import AccountInfo from "./pages/AccountInfo";
 import UpdateNotifier from "./components/UpdateNotifier";
 
@@ -25,6 +26,7 @@ export default function App() {
 					<Route path="/menu/:id/account" element={<AccountInfo />} />
 					<Route path="/menu/:id/favourites" element={<Favourites />} />
 					<Route path="/menu/:id/history" element={<History />} />
+					<Route path="/menu/:id/downloads" element={<Downloads />} />
 					<Route path="/menu/:id/settings" element={<Settings />} />
 					<Route path="/menu/:id/tv" element={<LiveTv />} />
 					<Route path="/menu/:id/movies" element={<Movies />} />

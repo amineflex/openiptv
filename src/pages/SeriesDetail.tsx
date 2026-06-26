@@ -2,15 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeftIcon, CalendarDaysIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
 import FavouriteButton from "../components/FavouriteButton";
+import DownloadButton from "../components/DownloadButton";
 import NotFound from "../components/NotFound";
 import StarRating from "../components/StarRating";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
 import { formatReleaseDate } from "../services/dateService";
 import { generateStreamUrl } from "../services/streamService";
+import { buildDownloadId } from "../services/downloadsService";
 import { extractSubtitleTracks } from "../services/subtitleService";
 import { buildWatchRoute } from "../services/watchRoute";
-import type { SeriesEpisode, SeriesInfo, SubtitleTrack, WatchNextEpisode } from "../types";
+import type { DownloadStartInput, SeriesEpisode, SeriesInfo, SubtitleTrack, WatchNextEpisode } from "../types";
 import { PLACEHOLDER_POSTER } from "../constants";
 
 function getEpisodeTitle(episode: SeriesEpisode): string {
@@ -192,11 +194,32 @@ export default function SeriesDetail() {
 			category: title,
 			icon: episode.info?.movie_image || seriesInfo.info?.cover
 		});
+		const downloadItem: DownloadStartInput = {
+			id: buildDownloadId(stream.id, "episode", episode.id),
+			streamId: stream.id,
+			kind: "episode",
+			title: episode.title || getEpisodeTitle(episode),
+			subtitle: `${title} · S${season || "?"}E${episode.episode_num ?? "?"}`,
+			image: episode.info?.movie_image || seriesInfo.info?.cover,
+			url: streamUrl,
+			container: episode.container_extension || "mp4",
+			seriesId,
+			seriesTitle: title,
+			season,
+			episodeNum: episode.episode_num,
+			route: `/menu/${id}/series/v/${seriesId}`,
+			subtitles: getEpisodeSubtitles(episode, stream.domain).map((track) => ({
+				language: track.language,
+				label: track.label,
+				url: track.src
+			}))
+		};
 
 		return {
 			episode,
 			streamUrl,
 			route,
+			downloadItem,
 			subtitles: getEpisodeSubtitles(episode, stream.domain)
 		};
 	});
@@ -329,43 +352,47 @@ export default function SeriesDetail() {
 							const episodeDate = formatReleaseDate(episode.info?.releasedate);
 
 							return (
-								<Link
-									key={episode.id}
-									to={watchItem.route}
-									state={{
-										subtitles: watchItem.subtitles,
-										nextEpisode: nextByEpisodeId[String(episode.id)],
-										backTo: `/menu/${id}/series/v/${seriesId}`,
-										backLabel: title
-									}}
-									className="group flex min-h-[132px] gap-4 rounded-xl border border-white/10 bg-primary/10 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-xl hover:shadow-secondary-400/10"
-								>
-									<div className="relative h-28 w-40 flex-none overflow-hidden rounded-lg bg-black">
-										<img
-											src={episode.info?.movie_image || seriesInfo.info?.cover || PLACEHOLDER_POSTER}
-											alt={getEpisodeTitle(episode)}
-											loading="lazy"
-											className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-										/>
-										<div className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition group-hover:opacity-100">
-											<PlayCircleIcon className="h-11 w-11 text-secondary-400" />
+								<div key={episode.id} className="relative">
+									<Link
+										to={watchItem.route}
+										state={{
+											subtitles: watchItem.subtitles,
+											nextEpisode: nextByEpisodeId[String(episode.id)],
+											backTo: `/menu/${id}/series/v/${seriesId}`,
+											backLabel: title
+										}}
+										className="group flex min-h-[132px] gap-4 rounded-xl border border-white/10 bg-primary/10 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-xl hover:shadow-secondary-400/10"
+									>
+										<div className="relative h-28 w-40 flex-none overflow-hidden rounded-lg bg-black">
+											<img
+												src={episode.info?.movie_image || seriesInfo.info?.cover || PLACEHOLDER_POSTER}
+												alt={getEpisodeTitle(episode)}
+												loading="lazy"
+												className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+											/>
+											<div className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition group-hover:opacity-100">
+												<PlayCircleIcon className="h-11 w-11 text-secondary-400" />
+											</div>
 										</div>
-									</div>
 
-									<div className="min-w-0 flex-1 py-1">
-										<div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-700">
-											<span className="rounded-full bg-secondary-400/15 px-2 py-0.5 font-bold text-secondary-400">
+										<div className="min-w-0 flex-1 py-1">
+											<div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-secondary-700">
+												<span className="rounded-full bg-secondary-400/15 px-2 py-0.5 font-bold text-secondary-400">
 												Episode {episode.episode_num || "-"}
-											</span>
-											{episodeDate && <span>{episodeDate}</span>}
-											{episode.info?.duration && <span>{episode.info.duration}</span>}
+												</span>
+												{episodeDate && <span>{episodeDate}</span>}
+												{episode.info?.duration && <span>{episode.info.duration}</span>}
+											</div>
+											<h3 className="line-clamp-2 text-lg font-bold text-white">{episode.title || getEpisodeTitle(episode)}</h3>
+											{episode.info?.plot && (
+												<p className="mt-2 line-clamp-2 text-sm leading-relaxed text-secondary-800">{episode.info.plot}</p>
+											)}
 										</div>
-										<h3 className="line-clamp-2 text-lg font-bold text-white">{episode.title || getEpisodeTitle(episode)}</h3>
-										{episode.info?.plot && (
-											<p className="mt-2 line-clamp-2 text-sm leading-relaxed text-secondary-800">{episode.info.plot}</p>
-										)}
+									</Link>
+									<div className="absolute right-2 top-2 z-10">
+										<DownloadButton item={watchItem.downloadItem} variant="compact" />
 									</div>
-								</Link>
+								</div>
 							);
 						})}
 					</div>
