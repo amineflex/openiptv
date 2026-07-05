@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
 	ArrowDownTrayIcon,
-	ArrowLeftIcon,
 	ArrowPathIcon,
 	ExclamationTriangleIcon,
 	FilmIcon,
@@ -12,6 +11,7 @@ import {
 	VideoCameraIcon,
 	XMarkIcon
 } from "@heroicons/react/24/outline";
+import BackButton from "../components/BackButton";
 import NotFound from "../components/NotFound";
 import SearchBar from "../components/SearchBar";
 import { useStreamLoader } from "../hooks/useStreamLoader";
@@ -98,7 +98,7 @@ function DownloadRow({ record, speed, onPlay, onCancel, onRetry, onReveal, onDel
 					) : null}
 					{record.subtitles && record.subtitles.length > 0 && (
 						<span
-							title={`${record.subtitles.length} sous-titre(s) téléchargé(s)`}
+							title={`${record.subtitles.length} subtitle(s) downloaded`}
 							className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-secondary-700"
 						>
 							CC {record.subtitles.length}
@@ -121,7 +121,7 @@ function DownloadRow({ record, speed, onPlay, onCancel, onRetry, onReveal, onDel
 					<button
 						type="button"
 						onClick={onPlay}
-						title="Lire dans le lecteur"
+						title="Play in app"
 						className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-400"
 					>
 						<PlayIcon className="h-4 w-4" />
@@ -132,7 +132,7 @@ function DownloadRow({ record, speed, onPlay, onCancel, onRetry, onReveal, onDel
 					<button
 						type="button"
 						onClick={onCancel}
-						title="Annuler"
+						title="Cancel"
 						className="rounded-full bg-dark/60 p-2 text-secondary hover:bg-red-600 hover:text-white"
 					>
 						<XMarkIcon className="h-5 w-5" />
@@ -142,7 +142,7 @@ function DownloadRow({ record, speed, onPlay, onCancel, onRetry, onReveal, onDel
 					<button
 						type="button"
 						onClick={onRetry}
-						title="Réessayer"
+						title="Retry"
 						className="rounded-full bg-dark/60 p-2 text-secondary hover:bg-secondary-400 hover:text-dark"
 					>
 						<ArrowPathIcon className="h-5 w-5" />
@@ -151,7 +151,7 @@ function DownloadRow({ record, speed, onPlay, onCancel, onRetry, onReveal, onDel
 				<button
 					type="button"
 					onClick={onReveal}
-					title="Voir le dossier"
+					title="Open folder"
 					className="rounded-full bg-dark/60 p-2 text-secondary hover:bg-secondary-400 hover:text-dark"
 				>
 					<FolderOpenIcon className="h-5 w-5" />
@@ -159,7 +159,7 @@ function DownloadRow({ record, speed, onPlay, onCancel, onRetry, onReveal, onDel
 				<button
 					type="button"
 					onClick={onDelete}
-					title="Supprimer"
+					title="Delete"
 					className="rounded-full bg-dark/60 p-2 text-secondary hover:bg-red-600 hover:text-white"
 				>
 					<TrashIcon className="h-5 w-5" />
@@ -279,22 +279,14 @@ export default function Downloads() {
 
 	return (
 		<div className="min-h-screen bg-dark text-secondary">
-			<div className="mx-auto max-w-5xl px-6 py-8">
+			<BackButton to={`/menu/${id}`} />
+			<div className="fade-in px-6 pb-8 pt-16">
 				<header className="flex flex-col gap-5 border-b border-primary/40 pb-6 md:flex-row md:items-center md:justify-between">
-					<div className="flex items-center gap-4">
-						<Link
-							to={`/menu/${id}`}
-							className="rounded-full bg-primary/20 p-2 text-secondary-400 hover:bg-primary/40"
-						>
-							<ArrowLeftIcon className="h-6 w-6" />
-						</Link>
-						<div>
-							<p className="text-sm font-semibold uppercase text-secondary-700">OpenIPTV</p>
-							<h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-white">
-								<ArrowDownTrayIcon className="h-7 w-7 text-secondary-400" />
-								Downloads
-							</h1>
-						</div>
+					<div>
+						<h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-white">
+							<ArrowDownTrayIcon className="h-7 w-7 text-secondary-400" />
+							Downloads
+						</h1>
 					</div>
 
 					<button
@@ -303,7 +295,7 @@ export default function Downloads() {
 						className="inline-flex items-center gap-2 self-start rounded-lg bg-primary/20 px-4 py-2 text-sm font-bold text-secondary transition hover:bg-secondary-400 hover:text-dark md:self-auto"
 					>
 						<FolderOpenIcon className="h-5 w-5" />
-						Voir le dossier
+						Open folder
 					</button>
 				</header>
 

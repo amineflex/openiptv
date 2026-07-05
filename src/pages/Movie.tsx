@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftIcon, PlayIcon } from "@heroicons/react/24/outline";
+import { Link, useParams } from "react-router-dom";
+import { PlayIcon } from "@heroicons/react/24/outline";
+import BackButton from "../components/BackButton";
 import FavouriteButton from "../components/FavouriteButton";
 import DownloadButton from "../components/DownloadButton";
 import NotFound from "../components/NotFound";
@@ -17,7 +18,6 @@ import { PLACEHOLDER_POSTER } from "../constants";
 
 export default function Movie() {
 	const { id, movieId } = useParams();
-	const navigate = useNavigate();
 	const stream = useStreamLoader(id);
 	const [movieInfo, setMovieInfo] = useState<VodInfo | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -58,10 +58,8 @@ export default function Movie() {
 	if (loading) {
 		return (
 			<div className="relative min-h-screen bg-dark text-secondary">
+				<BackButton />
 				<div className="absolute inset-x-0 top-0 h-[440px] animate-pulse bg-white/5" />
-				<div className="relative z-10 px-6 py-5">
-					<div className="h-10 w-10 animate-pulse rounded-full bg-white/10" />
-				</div>
 				<div className="relative z-10 mx-auto max-w-5xl px-6 pb-16 pt-20">
 					<div className="flex flex-col gap-8 md:flex-row md:items-end">
 						<div className="h-80 w-56 flex-none animate-pulse self-center rounded-2xl bg-white/10 md:self-auto" />
@@ -166,15 +164,7 @@ export default function Movie() {
 				<div className="absolute inset-0 bg-gradient-to-r from-dark/90 via-dark/40 to-transparent" />
 			</div>
 
-			<div className="relative z-10 px-6 py-5">
-				<button
-					type="button"
-					onClick={() => navigate(-1)}
-					className="inline-flex rounded-full bg-dark/50 p-2.5 text-secondary-400 backdrop-blur transition hover:bg-secondary-400 hover:text-dark"
-				>
-					<ArrowLeftIcon className="h-5 w-5" />
-				</button>
-			</div>
+			<BackButton />
 
 			<div className="fade-in relative z-10 mx-auto max-w-5xl px-6 pb-16 pt-20">
 				<div className="flex flex-col gap-8 md:flex-row md:items-end">

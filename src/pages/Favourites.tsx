@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-	ArrowLeftIcon,
 	FilmIcon,
 	HeartIcon,
 	TrashIcon,
 	VideoCameraIcon
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
+import BackButton from "../components/BackButton";
 import NotFound from "../components/NotFound";
+import PosterCard from "../components/PosterCard";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { favouritesService } from "../services/favouritesService";
 import type { FavouriteItem } from "../types";
-import { PLACEHOLDER_POSTER } from "../constants";
 
 type FilterKey = "all" | "movie" | "series";
 
@@ -66,22 +66,14 @@ export default function Favourites() {
 
 	return (
 		<div className="bg-dark text-secondary min-h-screen">
-			<div className="mx-auto max-w-7xl px-6 py-8">
+			<BackButton to={`/menu/${id}`} />
+			<div className="fade-in px-6 pb-8 pt-16">
 				<header className="flex flex-col gap-5 border-b border-primary/40 pb-6 md:flex-row md:items-center md:justify-between">
-					<div className="flex items-center gap-4">
-						<Link
-							to={`/menu/${id}`}
-							className="rounded-full bg-primary/20 p-2 text-secondary-400 hover:bg-primary/40"
-						>
-							<ArrowLeftIcon className="h-6 w-6" />
-						</Link>
-						<div>
-							<p className="text-sm font-semibold uppercase text-secondary-700">OpenIPTV</p>
-							<h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-white">
-								<HeartSolidIcon className="h-7 w-7 text-secondary-400" />
-								Favourites
-							</h1>
-						</div>
+					<div>
+						<h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-white">
+							<HeartSolidIcon className="h-7 w-7 text-secondary-400" />
+							Favourites
+						</h1>
 					</div>
 
 					<div className="flex flex-wrap gap-2">
@@ -125,42 +117,31 @@ export default function Favourites() {
 						</div>
 					</div>
 				) : (
-					<div className="flex flex-wrap gap-4 py-8">
+					<div className="flex flex-wrap gap-5 py-8">
 						{visibleFavourites.map((item) => (
-							<div key={`${item.streamId}:${item.type}:${item.id}`} className="group relative">
-								<Link
-									to={item.route}
-									style={{
-										backgroundImage: `url(${item.image || PLACEHOLDER_POSTER})`,
-										backgroundSize: "cover",
-										backgroundPosition: "center",
-										backgroundRepeat: "no-repeat",
-										height: "300px",
-										width: "200px"
-									}}
-									className="flex items-end overflow-hidden rounded-xl border-2 border-transparent bg-dark bg-cover bg-center transition-transform duration-300 hover:scale-105 hover:border-secondary-400/75"
-								>
-									<div className="w-full bg-gradient-to-t from-dark/90 to-transparent p-4 pt-10 duration-300 group-hover:from-dark">
-										<span className="mb-1 inline-flex items-center gap-1 rounded-full bg-dark/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-secondary-400">
-											{item.type === "movie" ? <FilmIcon className="h-3 w-3" /> : <VideoCameraIcon className="h-3 w-3" />}
-											{item.type}
-										</span>
-										<h2 className="line-clamp-2 text-lg font-semibold text-white/90">{item.title}</h2>
-										{item.subtitle && (
-											<p className="line-clamp-1 text-xs text-secondary-700">{item.subtitle}</p>
-										)}
-									</div>
-								</Link>
-
-								<button
-									type="button"
-									onClick={() => removeFavourite(item)}
-									title="Remove from favourites"
-									className="absolute right-2 top-2 rounded-full bg-dark/70 p-2 text-white opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-red-600"
-								>
-									<TrashIcon className="h-5 w-5" />
-								</button>
-							</div>
+							<PosterCard
+								key={`${item.streamId}:${item.type}:${item.id}`}
+								to={item.route}
+								title={item.title}
+								image={item.image}
+								subtitle={item.subtitle}
+								badge={
+									<>
+										{item.type === "movie" ? <FilmIcon className="h-3 w-3" /> : <VideoCameraIcon className="h-3 w-3" />}
+										{item.type}
+									</>
+								}
+								actions={
+									<button
+										type="button"
+										onClick={() => removeFavourite(item)}
+										title="Remove from favourites"
+										className="rounded-full bg-dark/70 p-2 text-white opacity-0 backdrop-blur transition hover:bg-red-600 group-hover:opacity-100"
+									>
+										<TrashIcon className="h-5 w-5" />
+									</button>
+								}
+							/>
 						))}
 					</div>
 				)}

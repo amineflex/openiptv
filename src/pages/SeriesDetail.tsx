@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftIcon, CalendarDaysIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
+import { Link, useParams } from "react-router-dom";
+import { CalendarDaysIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
+import BackButton from "../components/BackButton";
 import FavouriteButton from "../components/FavouriteButton";
 import DownloadButton from "../components/DownloadButton";
 import NotFound from "../components/NotFound";
@@ -39,7 +40,6 @@ function getEpisodeSubtitles(episode: SeriesEpisode, domain: string): SubtitleTr
 
 export default function SeriesDetail() {
 	const { id, seriesId } = useParams();
-	const navigate = useNavigate();
 	const stream = useStreamLoader(id);
 	const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -92,11 +92,9 @@ export default function SeriesDetail() {
 	if (loading) {
 		return (
 			<div className="relative min-h-screen bg-dark text-secondary">
+				<BackButton />
 				<div className="absolute inset-x-0 top-0 h-[420px] animate-pulse bg-white/5" />
-				<div className="relative z-10 px-6 py-5">
-					<div className="h-10 w-10 animate-pulse rounded-full bg-white/10" />
-				</div>
-				<main className="relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-12">
+				<main className="relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-20">
 					<div className="flex flex-col gap-8 md:flex-row md:items-end">
 						<div className="h-80 w-56 flex-none animate-pulse self-center rounded-2xl bg-white/10 md:self-auto" />
 						<div className="flex-1 space-y-4">
@@ -254,18 +252,9 @@ export default function SeriesDetail() {
 				<div className="absolute inset-0 bg-gradient-to-r from-dark via-dark/70 to-transparent" />
 			</div>
 
-			<div className="relative z-10 px-6 py-5">
-				<button
-					type="button"
-					onClick={() => navigate(-1)}
-					className="inline-flex rounded-full bg-dark/55 p-2.5 text-secondary-400 backdrop-blur transition hover:bg-secondary-400 hover:text-dark"
-					aria-label="Back"
-				>
-					<ArrowLeftIcon className="h-5 w-5" />
-				</button>
-			</div>
+			<BackButton />
 
-			<main className="fade-in relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-12">
+			<main className="fade-in relative z-10 mx-auto max-w-6xl px-6 pb-16 pt-20">
 				<header className="flex flex-col gap-8 md:flex-row md:items-end">
 					<img
 						src={seriesInfo.info.cover || PLACEHOLDER_POSTER}

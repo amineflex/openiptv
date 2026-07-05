@@ -1,6 +1,6 @@
 {
 	"name": "openiptvclient",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "A simple IPTV client using Electron and React",
 	"main": "dist-electron/main.js",
 	"scripts": {
@@ -15,7 +15,7 @@
 		"format": "prettier --write .",
 		"lint": "eslint ."
 	},
-	"author": "amineflex, sayrix",
+	"author": "amineflex",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -54,7 +54,6 @@
 		"mpegts.js": "^1.8.0",
 		"react": "^18.3.1",
 		"react-dom": "^18.3.1",
-		"react-router-dom": "^6.30.3",
-		"update-electron-app": "^3.2.0"
+		"react-router-dom": "^6.30.3"
 	}
 }

@@ -962,58 +962,7 @@ export function useVideoPlayer(
 			return;
 		}
 
-		if (window.openIptv.extractEmbeddedSubtitleWindow !== undefined) {
-			await loadEmbeddedSubtitleWindow(embeddedTrack, currentTimeRef.current);
-			return;
-		}
-
-		setSubtitleLoadingId(id);
-
-		try {
-			const result = await window.openIptv.extractEmbeddedSubtitle(streamUrl, embeddedTrack.index);
-			if (selectedSubtitleIdRef.current !== id) return;
-
-			if (!result.ok || !result.vtt) {
-				logger.warn("Embedded subtitle extraction failed", {
-					error: result.error,
-					streamIndex: embeddedTrack.index,
-					streamUrl
-				});
-				setSubtitleError(result.error ?? "Failed to extract subtitles");
-				return;
-			}
-
-			const normalizedVtt = normalizeVtt(result.vtt);
-			const renderOffset = subtitleRenderOffsetRef.current;
-			const renderSrc = createSubtitleRenderSrc(normalizedVtt, renderOffset);
-
-			const renderedTrack: PlayerSubtitleTrack = {
-				id,
-				label: embeddedTrack.label,
-				language: embeddedTrack.language,
-				src: renderSrc,
-				renderSrc,
-				normalizedVtt,
-				renderOffset,
-				ownsRenderSrc: true
-			};
-
-			setSubtitleTracks((tracks) => {
-				for (const track of tracks) {
-					if (track.id === id) revokeSubtitleRenderSrc(track);
-				}
-				return [...tracks.filter((track) => track.id !== id), renderedTrack];
-			});
-			setSelectedSubtitleId(id);
-		} catch (error) {
-			logger.exception("Failed to extract embedded subtitles", error, {
-				streamIndex: embeddedTrack.index,
-				streamUrl
-			});
-			setSubtitleError(error instanceof Error ? error.message : "Failed to extract subtitles");
-		} finally {
-			if (selectedSubtitleIdRef.current === id) setSubtitleLoadingId(null);
-		}
+		await loadEmbeddedSubtitleWindow(embeddedTrack, currentTimeRef.current);
 	}, [applyBurnInSubtitle, clearBurnInSubtitle, embeddedSubtitleTracks, loadEmbeddedSubtitleWindow, streamUrl, subtitleTracks, subtitles]);
 
 	useEffect(() => {

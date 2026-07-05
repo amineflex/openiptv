@@ -161,7 +161,7 @@ export default function LiveTv() {
 				backLink={`/menu/${id}`}
 			/>
 
-			<div className="md:w-4/5 w-2/3 bg-dark text-secondary h-screen overflow-y-scroll px-5 py-10">
+			<div className="h-screen flex-1 overflow-y-auto bg-dark px-6 py-8 text-secondary">
 				{selectedCategory ? (
 					<>
 						<h1 className="text-2xl font-bold mb-6">
@@ -197,19 +197,18 @@ export default function LiveTv() {
 											}}
 											className="group flex min-h-[112px] items-center gap-4 rounded-xl border border-white/10 bg-primary/10 p-4 text-left text-secondary shadow-lg shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-secondary-400/10"
 										>
-											<div className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-dark/70">
-												{channel.stream_icon ? (
+											<div className="relative flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-dark/70">
+												<span className="text-sm font-black text-secondary-400">{getChannelInitials(channel.name)}</span>
+												{channel.stream_icon && (
 													<img
 														src={channel.stream_icon}
 														alt={channel.name}
 														loading="lazy"
-														className="h-full w-full object-contain p-2"
+														className="absolute inset-0 h-full w-full bg-dark object-contain p-2"
 														onError={(event) => {
 															event.currentTarget.style.display = "none";
 														}}
 													/>
-												) : (
-													<span className="text-sm font-black text-secondary-400">{getChannelInitials(channel.name)}</span>
 												)}
 											</div>
 

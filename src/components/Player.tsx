@@ -18,6 +18,7 @@ import { usePictureInPicture } from "../hooks/usePictureInPicture";
 import { useVideoPlayer } from "../hooks/useVideoPlayer";
 import StreamInfoPanel from "./StreamInfoPanel";
 import type { ChannelInfo, SubtitleTrack, WatchNextEpisode } from "../types";
+import { PLACEHOLDER_POSTER } from "../constants";
 
 interface PlayerProps {
 	streamUrl: string | null;
@@ -263,13 +264,12 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 			{canOfferNextEpisode && nextEpisode && (
 				<div className="absolute bottom-28 right-5 z-50 w-[min(28rem,calc(100vw-2.5rem))] rounded-lg border border-white/10 bg-gray-950/95 p-3 text-white shadow-2xl backdrop-blur">
 					<div className="flex gap-3">
-						{nextEpisode.image && (
-							<img
-								src={nextEpisode.image}
-								alt={nextEpisode.title}
-								className="h-20 w-32 flex-none rounded-md bg-black object-cover"
-							/>
-						)}
+						<img
+							src={nextEpisode.image || PLACEHOLDER_POSTER}
+							alt={nextEpisode.title}
+							onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_POSTER; }}
+							className="h-20 w-32 flex-none rounded-md bg-black object-cover"
+						/>
 						<div className="min-w-0 flex-1">
 							<p className="text-xs font-bold uppercase tracking-wide text-secondary-400">Next episode</p>
 							<h2 className="mt-1 line-clamp-2 text-base font-bold">{nextEpisode.title}</h2>

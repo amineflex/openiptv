@@ -4,9 +4,6 @@ contextBridge.exposeInMainWorld("openIptv", {
 	listEmbeddedSubtitles: (streamUrl: string) =>
 		ipcRenderer.invoke("subtitle:list-embedded", streamUrl),
 
-	extractEmbeddedSubtitle: (streamUrl: string, streamIndex: number) =>
-		ipcRenderer.invoke("subtitle:extract-embedded", streamUrl, streamIndex),
-
 	extractEmbeddedSubtitleWindow: (
 		streamUrl: string,
 		streamIndex: number,
@@ -42,9 +39,6 @@ contextBridge.exposeInMainWorld("openIptv", {
 
 	getAppUsageStats: () =>
 		ipcRenderer.invoke("stats:get-app-usage"),
-
-	getSystemStats: () =>
-		ipcRenderer.invoke("stats:get-system"),
 
 	getFfmpegStats: () =>
 		ipcRenderer.invoke("stats:get-ffmpeg"),

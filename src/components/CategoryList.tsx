@@ -30,7 +30,7 @@ export default function CategoryList({ categories, selectedCategory, handleCateg
 	};
 
 	return (
-		<aside className="flex h-screen w-1/3 flex-col border-r border-white/10 bg-white/[0.02] md:w-1/5">
+		<aside className="flex h-screen w-56 flex-none flex-col border-r border-white/10 bg-white/[0.02] md:w-64 2xl:w-80">
 			<header className="flex items-center gap-3 border-b border-white/10 px-4 py-5">
 				<Link
 					to={backLink}

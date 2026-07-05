@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-	ArrowLeftIcon,
 	ClockIcon,
 	FilmIcon,
 	PlayIcon,
@@ -9,6 +8,7 @@ import {
 	TvIcon,
 	VideoCameraIcon
 } from "@heroicons/react/24/outline";
+import BackButton from "../components/BackButton";
 import NotFound from "../components/NotFound";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { historyService } from "../services/historyService";
@@ -98,22 +98,14 @@ export default function History() {
 
 	return (
 		<div className="bg-dark text-secondary min-h-screen">
-			<div className="mx-auto max-w-7xl px-6 py-8">
+			<BackButton to={`/menu/${id}`} />
+			<div className="fade-in px-6 pb-8 pt-16">
 				<header className="flex flex-col gap-5 border-b border-primary/40 pb-6 md:flex-row md:items-center md:justify-between">
-					<div className="flex items-center gap-4">
-						<Link
-							to={`/menu/${id}`}
-							className="rounded-full bg-primary/20 p-2 text-secondary-400 hover:bg-primary/40"
-						>
-							<ArrowLeftIcon className="h-6 w-6" />
-						</Link>
-						<div>
-							<p className="text-sm font-semibold uppercase text-secondary-700">OpenIPTV</p>
-							<h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-white">
-								<ClockIcon className="h-7 w-7 text-secondary-400" />
-								History
-							</h1>
-						</div>
+					<div>
+						<h1 className="mt-1 flex items-center gap-2 text-3xl font-bold text-white">
+							<ClockIcon className="h-7 w-7 text-secondary-400" />
+							History
+						</h1>
 					</div>
 
 					<div className="flex flex-wrap items-center gap-2">
@@ -202,12 +194,14 @@ export default function History() {
 												src={image}
 												alt=""
 												aria-hidden="true"
+												onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_POSTER; }}
 												className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-xl"
 											/>
 											<img
 												src={image}
 												alt={item.title}
 												loading="lazy"
+												onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_POSTER; }}
 												className="relative z-10 h-full w-full object-contain p-2"
 											/>
 

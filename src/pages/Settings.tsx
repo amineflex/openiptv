@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
-	ArrowLeftIcon,
 	CheckCircleIcon,
 	ClockIcon,
 	EyeIcon,
@@ -11,6 +10,7 @@ import {
 	ServerStackIcon,
 	ShieldExclamationIcon
 } from "@heroicons/react/24/outline";
+import BackButton from "../components/BackButton";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { storageService } from "../services/storageService";
 import { historyService } from "../services/historyService";
@@ -116,8 +116,9 @@ export default function Settings() {
 	return (
 		<div className="relative min-h-screen overflow-hidden bg-dark text-secondary">
 			<div className="pointer-events-none absolute -top-32 right-1/4 h-[28rem] w-[28rem] rounded-full bg-secondary-400/10 blur-3xl" />
+			<BackButton to={`/menu/${id}`} />
 
-			<form onSubmit={saveSettings} className="fade-in relative mx-auto max-w-5xl px-6 py-7">
+			<form onSubmit={saveSettings} className="fade-in relative mx-auto max-w-5xl px-6 pb-7 pt-16">
 				<header className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 					<div>
 						<h1 className="text-3xl font-bold text-white">Settings</h1>
@@ -130,13 +131,6 @@ export default function Settings() {
 								{saveMessage}
 							</span>
 						)}
-						<Link
-							to={`/menu/${id}`}
-							className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10"
-						>
-							<ArrowLeftIcon className="h-5 w-5" />
-							Back
-						</Link>
 						<button
 							type="submit"
 							disabled={!isFormValid}

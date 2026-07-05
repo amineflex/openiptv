@@ -110,23 +110,23 @@ export default function DownloadButton({ item, variant = "full" }: DownloadButto
 		return (
 			<div className="flex items-center gap-1.5" onClick={stop}>
 				{isDone ? (
-					<button type="button" onClick={handleOpen} title="Lire le téléchargement" className={`${round} bg-emerald-500/90 text-white hover:bg-emerald-400`}>
+					<button type="button" onClick={handleOpen} title="Play download" className={`${round} bg-emerald-500/90 text-white hover:bg-emerald-400`}>
 						<PlayIcon className="h-4 w-4" />
 					</button>
 				) : isActive ? (
-					<button type="button" onClick={handleCancel} title="Annuler le téléchargement" className={`${round} relative bg-dark/70 text-secondary-400 hover:text-white`}>
+					<button type="button" onClick={handleCancel} title="Cancel download" className={`${round} relative bg-dark/70 text-secondary-400 hover:text-white`}>
 						<ProgressRing percent={percent} size={20} />
 						<span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold tabular-nums">
 							{percent >= 0 ? Math.round(percent) : ""}
 						</span>
 					</button>
 				) : (
-					<button type="button" onClick={handleDownload} title={isError ? `Réessayer — ${record?.error ?? "échec"}` : "Télécharger"} className={`${round} bg-dark/70 text-white hover:bg-secondary-400 hover:text-dark`}>
+					<button type="button" onClick={handleDownload} title={isError ? `Retry — ${record?.error ?? "failed"}` : "Download"} className={`${round} bg-dark/70 text-white hover:bg-secondary-400 hover:text-dark`}>
 						{isError ? <ArrowPathIcon className="h-4 w-4" /> : <ArrowDownTrayIcon className="h-4 w-4" />}
 					</button>
 				)}
 
-				<button type="button" onClick={handleFolder} title="Voir le dossier" className={`${round} bg-dark/70 text-white hover:bg-secondary-400 hover:text-dark`}>
+				<button type="button" onClick={handleFolder} title="Open folder" className={`${round} bg-dark/70 text-white hover:bg-secondary-400 hover:text-dark`}>
 					<FolderOpenIcon className="h-4 w-4" />
 				</button>
 			</div>
@@ -137,25 +137,25 @@ export default function DownloadButton({ item, variant = "full" }: DownloadButto
 	return (
 		<div className="flex items-center gap-2">
 			{isDone ? (
-				<button type="button" onClick={handleOpen} title="Lire le fichier téléchargé" className={`${pill} bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25`}>
+				<button type="button" onClick={handleOpen} title="Play downloaded file" className={`${pill} bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25`}>
 					<CheckSolidIcon className="h-5 w-5" />
 					Downloaded
 				</button>
 			) : isActive ? (
-				<button type="button" onClick={handleCancel} title="Annuler le téléchargement" className={`${pill} bg-primary/20 text-secondary hover:bg-red-600/80 hover:text-white`}>
+				<button type="button" onClick={handleCancel} title="Cancel download" className={`${pill} bg-primary/20 text-secondary hover:bg-red-600/80 hover:text-white`}>
 					<ProgressRing percent={percent} size={18} />
 					<span className="tabular-nums">{percent >= 0 ? `${Math.round(percent)}%` : "Starting…"}</span>
 					{speed ? <span className="text-xs font-medium text-secondary-700">{formatSpeed(speed)}</span> : null}
 					<XMarkIcon className="h-4 w-4 opacity-70" />
 				</button>
 			) : (
-				<button type="button" onClick={handleDownload} title={isError ? record?.error : "Télécharger pour regarder hors-ligne"} className={`${pill} bg-primary/20 text-secondary hover:bg-primary/40`}>
+				<button type="button" onClick={handleDownload} title={isError ? record?.error : "Download to watch offline"} className={`${pill} bg-primary/20 text-secondary hover:bg-primary/40`}>
 					{isError ? <ArrowPathIcon className="h-5 w-5" /> : <ArrowDownTrayIcon className="h-5 w-5" />}
 					{isError ? "Retry" : "Download"}
 				</button>
 			)}
 
-			<button type="button" onClick={handleFolder} title="Voir le dossier" className={`${pill} bg-primary/20 px-3 text-secondary hover:bg-primary/40`}>
+			<button type="button" onClick={handleFolder} title="Open folder" className={`${pill} bg-primary/20 px-3 text-secondary hover:bg-primary/40`}>
 				<FolderOpenIcon className="h-5 w-5" />
 			</button>
 		</div>

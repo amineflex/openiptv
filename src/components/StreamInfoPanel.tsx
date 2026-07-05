@@ -334,11 +334,7 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 		let active = true;
 
 		const tick = async () => {
-			const usageRequest = (
-				window.openIptv?.getAppUsageStats?.()
-				?? window.openIptv?.getSystemStats?.()
-				?? Promise.resolve(null)
-			);
+			const usageRequest = window.openIptv?.getAppUsageStats?.() ?? Promise.resolve(null);
 			const ffmpegRequest = window.openIptv?.getFfmpegStats?.() ?? Promise.resolve(null);
 			const [usage, ffmpeg] = await Promise.all([
 				usageRequest.catch(() => null),

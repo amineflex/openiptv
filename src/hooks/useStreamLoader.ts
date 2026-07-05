@@ -3,11 +3,14 @@ import { storageService } from "../services/storageService";
 import type { IptvStream } from "../types";
 
 export function useStreamLoader(id: string | undefined): IptvStream | null {
-	const [stream, setStream] = useState<IptvStream | null>(null);
+	// Resolve synchronously on the first render so pages don't flash
+	// "Stream not found" for a frame before the effect runs.
+	const [stream, setStream] = useState<IptvStream | null>(() =>
+		id ? storageService.getStreamById(id) : null
+	);
 
 	useEffect(() => {
-		if (!id) return;
-		setStream(storageService.getStreamById(id));
+		setStream(id ? storageService.getStreamById(id) : null);
 	}, [id]);
 
 	return stream;

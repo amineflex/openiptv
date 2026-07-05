@@ -438,11 +438,11 @@ export default function LivePlayer({
 					<button
 						type="button"
 						onClick={handleBack}
-						title={backLabel ? `Retour — ${backLabel}` : "Retour"}
+						title={backLabel ? `Back — ${backLabel}` : "Back"}
 						className="flex flex-none items-center gap-1.5 rounded-full bg-white/10 py-2 pl-2 pr-3.5 text-white transition-colors hover:bg-secondary-400 hover:text-dark"
 					>
 						<ArrowLeftIcon className="h-6 w-6 flex-none" />
-						<span className="max-w-[28vw] truncate text-sm font-semibold">{backLabel ?? "Retour"}</span>
+						<span className="max-w-[28vw] truncate text-sm font-semibold">{backLabel ?? "Back"}</span>
 					</button>
 
 					{channelInfo.icon && (
@@ -668,18 +668,17 @@ export default function LivePlayer({
 														: "text-secondary-800 hover:bg-white/5 hover:text-white"
 											}`}
 										>
-											<div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/60">
-												{ch.icon ? (
+											<div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/60">
+												<span className="text-xs font-black text-secondary-400">
+													{getInitials(ch.name)}
+												</span>
+												{ch.icon && (
 													<img
 														src={ch.icon}
 														alt={ch.name}
-														className="h-full w-full object-contain p-1"
+														className="absolute inset-0 h-full w-full bg-black/60 object-contain p-1"
 														onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
 													/>
-												) : (
-													<span className="text-xs font-black text-secondary-400">
-														{getInitials(ch.name)}
-													</span>
 												)}
 											</div>
 

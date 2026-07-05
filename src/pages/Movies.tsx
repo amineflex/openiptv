@@ -94,7 +94,7 @@ export default function Movies() {
 				backLink={`/menu/${id}`}
 			/>
 
-			<div className="h-screen w-2/3 overflow-y-scroll bg-dark px-6 py-8 text-secondary md:w-4/5">
+			<div className="h-screen flex-1 overflow-y-auto bg-dark px-6 py-8 text-secondary">
 				{selectedVodCategory ? (
 					<>
 						<div className="mb-5 flex flex-wrap items-center gap-3">

@@ -1,5 +1,4 @@
 import type {
-	EmbeddedSubtitleExtractResult,
 	EmbeddedSubtitleListResult,
 	EmbeddedSubtitleWindowResult,
 	StreamProxyResult,
@@ -19,10 +18,6 @@ declare global {
 	interface Window {
 		openIptv?: {
 			listEmbeddedSubtitles: (streamUrl: string) => Promise<EmbeddedSubtitleListResult>;
-			extractEmbeddedSubtitle: (
-				streamUrl: string,
-				streamIndex: number
-			) => Promise<EmbeddedSubtitleExtractResult>;
 			extractEmbeddedSubtitleWindow: (
 				streamUrl: string,
 				streamIndex: number,
@@ -37,7 +32,6 @@ declare global {
 			probeStreamInfo: (streamUrl: string) => Promise<StreamInfoResult>;
 			stopTranscoding: () => Promise<{ ok: boolean }>;
 			getAppUsageStats: () => Promise<AppUsageStats>;
-			getSystemStats: () => Promise<AppUsageStats>;
 			getFfmpegStats: () => Promise<FfmpegServerStats>;
 			// Auto-updater — returns a cleanup function to remove the listener
 			onUpdateAvailable: (cb: () => void) => () => void;

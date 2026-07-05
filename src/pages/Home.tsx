@@ -11,7 +11,6 @@ export default function Home() {
 
 			<div className="fade-in relative mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-6 py-16">
 				<header className="mb-12 flex flex-col items-center text-center">
-		
 					<h1 className="text-5xl font-bold tracking-tight text-white">
 						Open<span className="text-secondary-400">IPTV</span>
 					</h1>
@@ -24,6 +23,10 @@ export default function Home() {
 					<AddStream />
 				</div>
 			</div>
+
+			<span className="pointer-events-none absolute bottom-2 right-3 text-[10px] text-secondary-700/60">
+				by amineflex
+			</span>
 		</div>
 	);
 }

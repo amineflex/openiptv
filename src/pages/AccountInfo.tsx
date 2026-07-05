@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
-	ArrowLeftIcon,
 	CheckCircleIcon,
 	ClockIcon,
 	ServerStackIcon,
@@ -10,6 +9,7 @@ import {
 	UserCircleIcon,
 	XCircleIcon
 } from "@heroicons/react/24/outline";
+import BackButton from "../components/BackButton";
 import LoadingSpinner from "../components/LoadingSpinner";
 import NotFound from "../components/NotFound";
 import { useStreamLoader } from "../hooks/useStreamLoader";
@@ -130,23 +130,13 @@ export default function AccountInfo() {
 				<div className="absolute bottom-[-12rem] right-[-8rem] h-[32rem] w-[32rem] rounded-full bg-sky-400/10 blur-3xl" />
 			</div>
 
-			<div className="fade-in relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-7">
+			<BackButton to={`/menu/${id}`} />
+			<div className="fade-in relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 pb-7 pt-16">
 				<header className="flex flex-col gap-5 border-b border-white/10 pb-6 md:flex-row md:items-center md:justify-between">
-					<div className="flex items-center gap-4">
-						<Link
-							to={`/menu/${id}`}
-							className="inline-flex rounded-full bg-white/5 p-2.5 text-secondary-400 transition hover:bg-secondary-400 hover:text-dark"
-							aria-label="Back to menu"
-						>
-							<ArrowLeftIcon className="h-5 w-5" />
-						</Link>
-						<div>
-							<p className="text-xs font-semibold uppercase tracking-widest text-secondary-700">OpenIPTV</p>
-							<h1 className="mt-1 text-3xl font-bold text-white">Account Info</h1>
-						</div>
+					<div>
+						<p className="text-xs font-semibold uppercase tracking-widest text-secondary-700">OpenIPTV</p>
+						<h1 className="mt-1 text-3xl font-bold text-white">Account Info</h1>
 					</div>
-
-					
 				</header>
 
 				<main className="grid flex-1 gap-6 py-8 lg:grid-cols-[360px_1fr]">
