@@ -1,18 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import {
+	ArrowDownTrayIcon,
+	ArrowUpTrayIcon,
 	CheckCircleIcon,
 	ClockIcon,
 	EyeIcon,
 	EyeSlashIcon,
 	FilmIcon,
 	ServerStackIcon,
-	ShieldExclamationIcon
+	ShieldExclamationIcon,
+	TrashIcon
 } from "@heroicons/react/24/outline";
 import BackButton from "../components/BackButton";
 import { useStreamLoader } from "../hooks/useStreamLoader";
+import { configService } from "../services/configService";
 import { storageService } from "../services/storageService";
+import { streamCache } from "../services/streamCache";
 import { historyService } from "../services/historyService";
 import type { IptvStream, StreamInput, StreamSettings } from "../types";
 
@@ -42,6 +47,11 @@ export default function Settings() {
 	const [stream, setStream] = useState<IptvStream | null>(null);
 	const [saveMessage, setSaveMessage] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
+	const [clearingCache, setClearingCache] = useState(false);
+	const [cacheMessage, setCacheMessage] = useState("");
+	const [dataMessage, setDataMessage] = useState("");
+	const [dataError, setDataError] = useState("");
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
 		if (loadedStream) {
@@ -102,6 +112,51 @@ export default function Settings() {
 		historyService.applyLimit(id, stream.settings.maxHistoryItems);
 		setSaveMessage("Settings saved");
 		setTimeout(() => setSaveMessage(""), 3000);
+	};
+
+	const clearCache = async () => {
+		setClearingCache(true);
+		await streamCache.clear();
+		setClearingCache(false);
+		setCacheMessage("Cache cleared");
+		setTimeout(() => setCacheMessage(""), 3000);
+	};
+
+	const exportSettings = () => {
+		const blob = new Blob([configService.export()], { type: "application/json" });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+		anchor.href = url;
+		anchor.download = `openiptv-backup-${new Date().toISOString().slice(0, 10)}.json`;
+		document.body.appendChild(anchor);
+		anchor.click();
+		anchor.remove();
+		URL.revokeObjectURL(url);
+		setDataError("");
+		setDataMessage("Settings exported");
+		setTimeout(() => setDataMessage(""), 3000);
+	};
+
+	const importSettings = async (event: ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		event.target.value = ""; // let the same file be picked again later
+		if (!file) return;
+
+		if (!window.confirm("Import settings? This overwrites your current accounts and preferences, then reloads the app.")) {
+			return;
+		}
+
+		const result = configService.import(await file.text());
+		if (!result.ok) {
+			setDataMessage("");
+			setDataError(result.error ?? "Import failed");
+			setTimeout(() => setDataError(""), 4000);
+			return;
+		}
+
+		setDataError("");
+		setDataMessage("Settings imported — reloading…");
+		setTimeout(() => window.location.reload(), 800);
 	};
 
 	if (!stream) {
@@ -314,6 +369,83 @@ export default function Settings() {
 											{format}
 										</button>
 									))}
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<section className="grid gap-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:grid-cols-[240px_1fr]">
+						<div className="flex items-start gap-3">
+							<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary-400/15 text-secondary-400">
+								<TrashIcon className="h-6 w-6" />
+							</span>
+							<div>
+								<h2 className="text-lg font-bold text-white">Data</h2>
+								<p className="mt-1 text-sm text-secondary-800">Cache &amp; backup</p>
+							</div>
+						</div>
+
+						<div className="flex flex-col gap-5">
+							<div className="flex flex-col gap-3">
+								<p className="text-sm text-secondary-800">
+									Channel, movie and series lists are cached so they load instantly. Clear the cache if lists look out of date.
+								</p>
+								<div className="flex items-center gap-3">
+									<button
+										type="button"
+										onClick={() => void clearCache()}
+										disabled={clearingCache}
+										className="inline-flex items-center gap-2 self-start rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-bold text-secondary transition hover:border-red-400/50 hover:bg-red-400/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										<TrashIcon className="h-5 w-5" />
+										{clearingCache ? "Clearing..." : "Clear cache"}
+									</button>
+									{cacheMessage && (
+										<span className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-400">
+											<CheckCircleIcon className="h-5 w-5" />
+											{cacheMessage}
+										</span>
+									)}
+								</div>
+							</div>
+
+							<div className="flex flex-col gap-3 border-t border-white/10 pt-5">
+								<p className="text-sm text-secondary-800">
+									Export your accounts, preferences, favourites and watch history to a file, or import a previous backup.
+								</p>
+								<div className="flex flex-wrap items-center gap-3">
+									<button
+										type="button"
+										onClick={exportSettings}
+										className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-bold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400"
+									>
+										<ArrowDownTrayIcon className="h-5 w-5" />
+										Export settings
+									</button>
+									<button
+										type="button"
+										onClick={() => fileInputRef.current?.click()}
+										className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-bold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400"
+									>
+										<ArrowUpTrayIcon className="h-5 w-5" />
+										Import settings
+									</button>
+									<input
+										ref={fileInputRef}
+										type="file"
+										accept="application/json,.json"
+										onChange={(event) => void importSettings(event)}
+										className="hidden"
+									/>
+									{dataMessage && (
+										<span className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-400">
+											<CheckCircleIcon className="h-5 w-5" />
+											{dataMessage}
+										</span>
+									)}
+									{dataError && (
+										<span className="text-sm font-semibold text-red-400">{dataError}</span>
+									)}
 								</div>
 							</div>
 						</div>

@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld("openIptv", {
 	stopTranscoding: () =>
 		ipcRenderer.invoke("media:stop-transcoding"),
 
+	openExternal: (url: string) =>
+		ipcRenderer.invoke("shell:open-external", url),
+
 	getAppUsageStats: () =>
 		ipcRenderer.invoke("stats:get-app-usage"),
 

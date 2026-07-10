@@ -2,17 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { FilmIcon } from "@heroicons/react/24/outline";
 import CategoryList from "../components/CategoryList";
-import LoadingSpinner from "../components/LoadingSpinner";
 import NotFound from "../components/NotFound";
 import PosterCard from "../components/PosterCard";
+import PosterCardSkeleton from "../components/PosterCardSkeleton";
 import SearchBar from "../components/SearchBar";
+import SortSelect from "../components/SortSelect";
+import { useCachedStreams } from "../hooks/useCachedStreams";
 import { useVodCategories } from "../hooks/useCategories";
 import { useSearch } from "../hooks/useSearch";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
 import { filterAdultItems, isAdultCategory } from "../services/adultContentFilter";
+import { BASE_SORT_OPTIONS, DATE_SORT_OPTIONS, sortStreams } from "../services/sortStreams";
 import { storageService } from "../services/storageService";
+import type { SortMode } from "../services/sortStreams";
 import type { Category, VodStream } from "../types";
+
+const VOD_SORT_OPTIONS = [...BASE_SORT_OPTIONS, ...DATE_SORT_OPTIONS];
 
 export default function Movies() {
 	const { id } = useParams();
@@ -21,9 +27,14 @@ export default function Movies() {
 
 	const itemsPerPage = stream?.settings.maxVodPerPage ?? 50;
 	const [selectedVodCategory, setSelectedVodCategory] = useState<Category | null>(null);
-	const [vods, setVods] = useState<VodStream[]>([]);
-	const [loading, setLoading] = useState(false);
+	const { items: vods, loading } = useCachedStreams<VodStream>(
+		stream,
+		selectedVodCategory,
+		"get_vod_streams",
+		apiService.fetchVodStreamsByCategory
+	);
 	const [page, setPage] = useState(0);
+	const [sort, setSort] = useState<SortMode>("default");
 	const adultContentEnabled = stream?.settings.adultChannel ?? false;
 	const visibleCategories = filterAdultItems(categories, adultContentEnabled);
 	const visibleVods = filterAdultItems(vods, adultContentEnabled, selectedVodCategory?.category_name);
@@ -40,7 +51,15 @@ export default function Movies() {
 		results: searchedVods,
 		setQuery: setSearchQuery,
 		clearSearch
-	} = useSearch({ items: visibleVods, fields: vodSearchFields });
+	} = useSearch({ items: visibleVods, fields: vodSearchFields, persistKey: stream ? `vod:${stream.id}` : undefined });
+
+	const sortedVods = useMemo(
+		() => sortStreams(searchedVods, sort, {
+			getName: (vod) => vod.name,
+			getDate: (vod) => Number(vod.added) || 0
+		}),
+		[searchedVods, sort]
+	);
 
 	useEffect(() => {
 		if (!stream) return;
@@ -50,28 +69,13 @@ export default function Movies() {
 
 	useEffect(() => {
 		setPage(0);
-	}, [itemsPerPage, selectedVodCategory, searchQuery]);
+	}, [itemsPerPage, selectedVodCategory, searchQuery, sort]);
 
+	// Keep the page in range if the list shrinks so pagination never blanks out.
 	useEffect(() => {
-		if (!stream || !selectedVodCategory) return;
-
-		const controller = new AbortController();
-		const categoryId = selectedVodCategory.category_id === "all" ? undefined : selectedVodCategory.category_id;
-
-		const fetchVods = async () => {
-			setLoading(true);
-			const data = await apiService.fetchVodStreamsByCategory(stream, categoryId, controller.signal);
-
-			if (!controller.signal.aborted) {
-				setVods(data ?? []);
-				setLoading(false);
-			}
-		};
-
-		void fetchVods();
-
-		return () => controller.abort();
-	}, [selectedVodCategory, stream]);
+		const pageCount = Math.max(1, Math.ceil(sortedVods.length / itemsPerPage));
+		if (page > pageCount - 1) setPage(pageCount - 1);
+	}, [sortedVods.length, itemsPerPage, page]);
 
 	const handleCategorySelect = (category: Category) => {
 		if (!stream) return;
@@ -110,16 +114,29 @@ export default function Movies() {
 							placeholder="Search movies"
 							resultCount={searchedVods.length}
 							totalCount={visibleVods.length}
+							trailing={<SortSelect value={sort} onChange={setSort} options={VOD_SORT_OPTIONS} />}
 						/>
 
 						{loading ? (
-							<div className="flex justify-center mt-10">
-								<LoadingSpinner />
+							<div className="flex flex-wrap gap-5">
+								{Array.from({ length: 15 }).map((_, index) => (
+									<PosterCardSkeleton key={index} />
+								))}
+							</div>
+						) : sortedVods.length === 0 ? (
+							<div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+								<FilmIcon className="h-14 w-14 text-primary-600" />
+								<p className="text-lg font-semibold text-white">No movies to show</p>
+								<p className="text-sm text-secondary-700">
+									{searchQuery
+										? "No movie matches your search."
+										: "This category came back empty — go back and open it again to reload."}
+								</p>
 							</div>
 						) : (
 							<div className="fade-in">
 								<div className="flex flex-wrap gap-5">
-									{searchedVods.slice(page * itemsPerPage, (page + 1) * itemsPerPage).map((vod) => (
+									{sortedVods.slice(page * itemsPerPage, (page + 1) * itemsPerPage).map((vod) => (
 										<PosterCard
 											key={vod.stream_id}
 											to={`v/${vod.stream_id}`}
@@ -131,7 +148,7 @@ export default function Movies() {
 									))}
 								</div>
 
-								{searchedVods.length > itemsPerPage && (
+								{sortedVods.length > itemsPerPage && (
 									<div className="mt-8 flex items-center justify-center gap-3">
 										<button
 											type="button"
@@ -142,12 +159,12 @@ export default function Movies() {
 											&#8592; Prev
 										</button>
 										<span className="rounded-lg bg-white/5 px-3 py-2 text-sm text-secondary-700">
-											Page <span className="font-bold text-white">{page + 1}</span> / {Math.ceil(searchedVods.length / itemsPerPage)}
+											Page <span className="font-bold text-white">{page + 1}</span> / {Math.ceil(sortedVods.length / itemsPerPage)}
 										</span>
 										<button
 											type="button"
-											onClick={() => setPage((p) => Math.min(Math.ceil(searchedVods.length / itemsPerPage) - 1, p + 1))}
-											disabled={page >= Math.ceil(searchedVods.length / itemsPerPage) - 1}
+											onClick={() => setPage((p) => Math.min(Math.ceil(sortedVods.length / itemsPerPage) - 1, p + 1))}
+											disabled={page >= Math.ceil(sortedVods.length / itemsPerPage) - 1}
 											className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-semibold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400 disabled:cursor-not-allowed disabled:opacity-30"
 										>
 											Next &#8594;

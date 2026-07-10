@@ -31,6 +31,7 @@ declare global {
 			releaseStreamProxy: (proxyId: string) => Promise<{ ok: boolean }>;
 			probeStreamInfo: (streamUrl: string) => Promise<StreamInfoResult>;
 			stopTranscoding: () => Promise<{ ok: boolean }>;
+			openExternal: (url: string) => Promise<{ ok: boolean }>;
 			getAppUsageStats: () => Promise<AppUsageStats>;
 			getFfmpegStats: () => Promise<FfmpegServerStats>;
 			// Auto-updater — returns a cleanup function to remove the listener

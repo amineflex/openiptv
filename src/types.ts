@@ -63,6 +63,8 @@ export interface VodStream {
 	stream_icon?: string;
 	rating?: string | number;
 	container_extension?: string;
+	// Epoch seconds (as a string) for when the title was added — used for sorting.
+	added?: string;
 }
 
 export interface SeriesItem {
@@ -70,6 +72,8 @@ export interface SeriesItem {
 	series_id: string | number;
 	cover?: string;
 	rating_5based?: string | number;
+	// Epoch seconds (as a string); series have no `added`, this is their date field.
+	last_modified?: string;
 }
 
 export interface SeriesEpisode {
@@ -100,6 +104,7 @@ export interface SeriesInfo {
 		rating?: string | number;
 		releaseDate?: string;
 		releasedate?: string;
+		youtube_trailer?: string;
 	};
 	episodes?: Record<string, SeriesEpisode[]>;
 }
@@ -114,6 +119,8 @@ export interface VodInfo {
 		plot?: string;
 		rating?: string | number;
 		releasedate?: string;
+		youtube_trailer?: string;
+		trailer?: string;
 		subtitles?: unknown;
 		subtitle?: unknown;
 	};

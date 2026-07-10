@@ -2,17 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { VideoCameraIcon } from "@heroicons/react/24/outline";
 import CategoryList from "../components/CategoryList";
-import LoadingSpinner from "../components/LoadingSpinner";
 import NotFound from "../components/NotFound";
 import PosterCard from "../components/PosterCard";
+import PosterCardSkeleton from "../components/PosterCardSkeleton";
 import SearchBar from "../components/SearchBar";
+import SortSelect from "../components/SortSelect";
+import { useCachedStreams } from "../hooks/useCachedStreams";
 import { useSerieCategories } from "../hooks/useCategories";
 import { useSearch } from "../hooks/useSearch";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
 import { filterAdultItems, isAdultCategory } from "../services/adultContentFilter";
+import { BASE_SORT_OPTIONS, DATE_SORT_OPTIONS, sortStreams } from "../services/sortStreams";
 import { storageService } from "../services/storageService";
+import type { SortMode } from "../services/sortStreams";
 import type { Category, SeriesItem } from "../types";
+
+const SERIES_SORT_OPTIONS = [...BASE_SORT_OPTIONS, ...DATE_SORT_OPTIONS];
 
 export default function Series() {
 	const { id } = useParams();
@@ -21,9 +27,14 @@ export default function Series() {
 
 	const itemsPerPage = stream?.settings.maxVodPerPage ?? 50;
 	const [selectedSerieCategory, setSelectedSerieCategory] = useState<Category | null>(null);
-	const [series, setSeries] = useState<SeriesItem[]>([]);
-	const [loading, setLoading] = useState(false);
+	const { items: series, loading } = useCachedStreams<SeriesItem>(
+		stream,
+		selectedSerieCategory,
+		"get_series",
+		apiService.fetchSeriesByCategory
+	);
 	const [page, setPage] = useState(0);
+	const [sort, setSort] = useState<SortMode>("default");
 	const adultContentEnabled = stream?.settings.adultChannel ?? false;
 	const visibleCategories = filterAdultItems(categories, adultContentEnabled);
 	const visibleSeries = filterAdultItems(series, adultContentEnabled, selectedSerieCategory?.category_name);
@@ -40,7 +51,15 @@ export default function Series() {
 		results: searchedSeries,
 		setQuery: setSearchQuery,
 		clearSearch
-	} = useSearch({ items: visibleSeries, fields: seriesSearchFields });
+	} = useSearch({ items: visibleSeries, fields: seriesSearchFields, persistKey: stream ? `series:${stream.id}` : undefined });
+
+	const sortedSeries = useMemo(
+		() => sortStreams(searchedSeries, sort, {
+			getName: (serie) => serie.name,
+			getDate: (serie) => Number(serie.last_modified) || 0
+		}),
+		[searchedSeries, sort]
+	);
 
 	useEffect(() => {
 		if (!stream) return;
@@ -50,28 +69,13 @@ export default function Series() {
 
 	useEffect(() => {
 		setPage(0);
-	}, [itemsPerPage, selectedSerieCategory, searchQuery]);
+	}, [itemsPerPage, selectedSerieCategory, searchQuery, sort]);
 
+	// Keep the page in range if the list shrinks so pagination never blanks out.
 	useEffect(() => {
-		if (!stream || !selectedSerieCategory) return;
-
-		const controller = new AbortController();
-		const categoryId = selectedSerieCategory.category_id === "all" ? undefined : selectedSerieCategory.category_id;
-
-		const fetchSeries = async () => {
-			setLoading(true);
-			const data = await apiService.fetchSeriesByCategory(stream, categoryId, controller.signal);
-
-			if (!controller.signal.aborted) {
-				setSeries(data ?? []);
-				setLoading(false);
-			}
-		};
-
-		void fetchSeries();
-
-		return () => controller.abort();
-	}, [selectedSerieCategory, stream]);
+		const pageCount = Math.max(1, Math.ceil(sortedSeries.length / itemsPerPage));
+		if (page > pageCount - 1) setPage(pageCount - 1);
+	}, [sortedSeries.length, itemsPerPage, page]);
 
 	const handleCategorySelect = (category: Category) => {
 		if (!stream) return;
@@ -110,15 +114,29 @@ export default function Series() {
 							placeholder="Search series"
 							resultCount={searchedSeries.length}
 							totalCount={visibleSeries.length}
+							trailing={<SortSelect value={sort} onChange={setSort} options={SERIES_SORT_OPTIONS} />}
 						/>
 
 						{loading ? (
-							<div className="flex justify-center mt-10">
-								<LoadingSpinner />
-							</div>						) : (
+							<div className="flex flex-wrap gap-5">
+								{Array.from({ length: 15 }).map((_, index) => (
+									<PosterCardSkeleton key={index} />
+								))}
+							</div>
+						) : sortedSeries.length === 0 ? (
+							<div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+								<VideoCameraIcon className="h-14 w-14 text-primary-600" />
+								<p className="text-lg font-semibold text-white">No series to show</p>
+								<p className="text-sm text-secondary-700">
+									{searchQuery
+										? "No series matches your search."
+										: "This category came back empty — go back and open it again to reload."}
+								</p>
+							</div>
+						) : (
 							<div className="fade-in">
 								<div className="flex flex-wrap gap-5">
-									{searchedSeries.slice(page * itemsPerPage, (page + 1) * itemsPerPage).map((serie) => (
+									{sortedSeries.slice(page * itemsPerPage, (page + 1) * itemsPerPage).map((serie) => (
 										<PosterCard
 											key={serie.series_id}
 											to={`v/${serie.series_id}`}
@@ -130,7 +148,7 @@ export default function Series() {
 									))}
 								</div>
 
-								{searchedSeries.length > itemsPerPage && (
+								{sortedSeries.length > itemsPerPage && (
 									<div className="mt-8 flex items-center justify-center gap-3">
 										<button
 											type="button"
@@ -141,12 +159,12 @@ export default function Series() {
 											&#8592; Prev
 										</button>
 										<span className="rounded-lg bg-white/5 px-3 py-2 text-sm text-secondary-700">
-											Page <span className="font-bold text-white">{page + 1}</span> / {Math.ceil(searchedSeries.length / itemsPerPage)}
+											Page <span className="font-bold text-white">{page + 1}</span> / {Math.ceil(sortedSeries.length / itemsPerPage)}
 										</span>
 										<button
 											type="button"
-											onClick={() => setPage((p) => Math.min(Math.ceil(searchedSeries.length / itemsPerPage) - 1, p + 1))}
-											disabled={page >= Math.ceil(searchedSeries.length / itemsPerPage) - 1}
+											onClick={() => setPage((p) => Math.min(Math.ceil(sortedSeries.length / itemsPerPage) - 1, p + 1))}
+											disabled={page >= Math.ceil(sortedSeries.length / itemsPerPage) - 1}
 											className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-semibold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400 disabled:cursor-not-allowed disabled:opacity-30"
 										>
 											Next &#8594;

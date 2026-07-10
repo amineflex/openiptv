@@ -250,6 +250,13 @@ export function useVideoPlayer(
 	const embeddedWindowLoadRef = useRef<{ id: string; start: number } | null>(null);
 	const lastLocalTimeRef = useRef(0);
 	const lastTranscodeRestartAtRef = useRef(0);
+	// Stall-watchdog memory. Kept in refs (not effect-local vars) so it survives
+	// the playback effect re-running on every transcode rebuild — otherwise the
+	// attempt cap would reset each rebuild and a slow stream would loop forever.
+	const stallProgressRef = useRef({ pos: -1, at: 0 });
+	const stallEverProgressedRef = useRef(false);
+	const stallLastNudgeAtRef = useRef(0);
+	const stallRecoverAttemptsRef = useRef(0);
 	const transcodePlayerRef = useRef<mpegts.Player | null>(null);
 	const playbackRateRef = useRef(1);
 	const transcodeBaseUrlRef = useRef<string | null>(null);
@@ -498,6 +505,16 @@ export function useVideoPlayer(
 		};
 	}, [createPlaybackProxy, releaseCurrentStreamProxy, streamUrl, type]);
 
+	// Reset the stall watchdog's memory when the media itself changes — but not on
+	// a transcode rebuild, which keeps the same streamUrl. Carrying the attempt
+	// cap or "ever progressed" flag into the next title would misfire the watchdog.
+	useEffect(() => {
+		stallProgressRef.current = { pos: -1, at: 0 };
+		stallEverProgressedRef.current = false;
+		stallLastNudgeAtRef.current = 0;
+		stallRecoverAttemptsRef.current = 0;
+	}, [streamUrl]);
+
 	// Attach the video source and wire up playback events (VOD only).
 	useEffect(() => {
 		const video = videoRef.current;
@@ -641,7 +658,94 @@ export function useVideoPlayer(
 		video.addEventListener("volumechange", syncVolume);
 		document.addEventListener("fullscreenchange", syncFullscreen);
 
+		// Stall watchdog. A hiccup on some VOD sources leaves the player stuck
+		// buffering forever — no `playing`, `timeupdate`, or `ended` ever fires
+		// again, so none of the recovery paths above trigger and the spinner just
+		// spins ("charge dans le vide"). We nudge it back to life automatically.
+		//
+		// Progress is measured on the *stream* position (streamOffset + local
+		// time), which stays continuous across a transcode rebuild — a plain local
+		// currentTime resets to 0 on rebuild and would be misread as progress,
+		// re-arming the watchdog forever. Transcoded streams also buffer
+		// legitimately for several seconds, so they get a much longer leash and a
+		// hard cap on rebuild attempts so a merely-slow source is never hammered
+		// into a permanent reload loop. All memory lives in refs so it survives
+		// this effect re-running on each rebuild.
+		const STALL_AFTER_MS = isTranscodedStream ? 14000 : 6000;
+		const NUDGE_COOLDOWN_MS = isTranscodedStream ? 12000 : 5000;
+		const MAX_TRANSCODE_RECOVERIES = 2;
+		const PROGRESS_EPSILON = 0.4;
+
+		const stallWatchdog = window.setInterval(() => {
+			const now = Date.now();
+			const streamPos = streamOffset + video.currentTime;
+
+			if (video.paused || video.seeking || video.ended) {
+				stallProgressRef.current = { pos: streamPos, at: now };
+				return;
+			}
+
+			// First tick after a (re)load: set the baseline without claiming
+			// progress, so initial buffering (incl. a resume seek where streamOffset
+			// is already high) doesn't arm the watchdog.
+			if (stallProgressRef.current.pos < 0) {
+				stallProgressRef.current = { pos: streamPos, at: now };
+				return;
+			}
+
+			// Genuine forward motion → healthy; arm the watchdog and reset the cap.
+			if (streamPos > stallProgressRef.current.pos + PROGRESS_EPSILON) {
+				stallProgressRef.current = { pos: streamPos, at: now };
+				stallEverProgressedRef.current = true;
+				stallRecoverAttemptsRef.current = 0;
+				return;
+			}
+
+			if (!stallEverProgressedRef.current) return;
+			if (now - stallProgressRef.current.at < STALL_AFTER_MS) return;
+			if (now - stallLastNudgeAtRef.current < NUDGE_COOLDOWN_MS) return;
+
+			// Transcoded: rebuild the ffmpeg pipe from the current position — but
+			// only a couple of times. If rebuilding isn't restoring progress the
+			// source is just slow/broken, and hammering it makes things worse.
+			if (isTranscodedStream && resolvedStreamUrl) {
+				if (stallRecoverAttemptsRef.current >= MAX_TRANSCODE_RECOVERIES) return;
+				stallRecoverAttemptsRef.current += 1;
+				stallLastNudgeAtRef.current = now;
+				logger.warn("VOD transcode stalled; rebuilding", {
+					attempt: stallRecoverAttemptsRef.current,
+					streamPos
+				});
+				setStreamOffset(streamPos);
+				setCurrentTime(streamPos);
+				currentTimeRef.current = streamPos;
+				lastLocalTimeRef.current = 0;
+				lastTranscodeRestartAtRef.current = now;
+				setIsBuffering(true);
+				setPlayableStreamUrl(buildSeekableTranscodeUrl(resolvedStreamUrl, streamPos, selectedTranscodeAudioIndex, burnSubtitleIndexRef.current));
+				return;
+			}
+
+			// Native playback: hop a hair forward — into buffered data when we have
+			// it — and re-issue play. The automatic version of "bouger la timeline".
+			stallLastNudgeAtRef.current = now;
+			const buffered = video.buffered;
+			let target = video.currentTime + 0.5;
+			for (let i = 0; i < buffered.length; i++) {
+				if (video.currentTime >= buffered.start(i) - 0.25 && video.currentTime < buffered.end(i)) {
+					target = Math.min(buffered.end(i) - 0.1, video.currentTime + 0.5);
+					break;
+				}
+			}
+			if (Number.isFinite(video.duration) && video.duration > 0) {
+				target = Math.min(target, video.duration - 0.1);
+			}
+			if (target > video.currentTime) video.currentTime = target;
+			void video.play();
+		}, 1000);
+
 		return () => {
+			window.clearInterval(stallWatchdog);
 			video.removeEventListener("loadedmetadata", handleLoadedMetadata);
 			video.removeEventListener("durationchange", handleDurationChange);
 			video.removeEventListener("timeupdate", handleTimeUpdate);

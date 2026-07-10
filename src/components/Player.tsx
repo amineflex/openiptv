@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePictureInPicture } from "../hooks/usePictureInPicture";
 import { useVideoPlayer } from "../hooks/useVideoPlayer";
+import { progressService, progressKeyFromUrl } from "../services/progressService";
 import StreamInfoPanel from "./StreamInfoPanel";
 import type { ChannelInfo, SubtitleTrack, WatchNextEpisode } from "../types";
 import { PLACEHOLDER_POSTER } from "../constants";
@@ -27,6 +28,9 @@ interface PlayerProps {
 	nextEpisode?: WatchNextEpisode;
 	backTo?: string;
 	backLabel?: string;
+	// Profile id + position (seconds) used to persist and restore playback.
+	streamId?: string;
+	resumeTime?: number;
 }
 
 function formatTime(value: number): string {
@@ -109,7 +113,7 @@ function getSubtitleMeta(option: SubtitleUiOption): string {
 	return option.source === "embedded" ? "Embedded track" : "Provider subtitle";
 }
 
-export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpisode, backTo, backLabel }: PlayerProps) {
+export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpisode, backTo, backLabel, streamId, resumeTime }: PlayerProps) {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const navigate = useNavigate();
@@ -148,6 +152,42 @@ export default function Player({ streamUrl, channelInfo, subtitles = [], nextEpi
 		toggleMute,
 		togglePlay
 	} = useVideoPlayer(videoRef, streamUrl, channelInfo.type, subtitles);
+
+	// Persist playback position every few seconds (and on exit) so the title can
+	// be resumed later; near the end progressService drops the entry itself.
+	const latestProgress = useRef({ currentTime: 0, duration: 0 });
+	useEffect(() => {
+		latestProgress.current = { currentTime, duration };
+	}, [currentTime, duration]);
+
+	useEffect(() => {
+		if (!streamId || channelInfo.type !== "vod") return;
+		const key = progressKeyFromUrl(streamUrl);
+		if (!key) return;
+
+		const persist = () => {
+			const { currentTime: time, duration: total } = latestProgress.current;
+			if (time > 0 && total > 0) progressService.save(streamId, key, time, total);
+		};
+
+		const interval = window.setInterval(persist, 5000);
+		return () => {
+			persist();
+			window.clearInterval(interval);
+		};
+	}, [streamId, streamUrl, channelInfo.type]);
+
+	// Jump to the requested resume point once the media reports a duration.
+	const resumeAppliedRef = useRef(false);
+	useEffect(() => {
+		resumeAppliedRef.current = false;
+	}, [streamUrl]);
+	useEffect(() => {
+		if (resumeAppliedRef.current) return;
+		if (!resumeTime || resumeTime <= 0 || duration <= 0) return;
+		resumeAppliedRef.current = true;
+		seekTo(resumeTime);
+	}, [duration, resumeTime, seekTo]);
 
 	const controlsVisible = isHovered || isPaused || isSettingsOpen || isInfoOpen;
 

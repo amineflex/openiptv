@@ -1,7 +1,9 @@
 import type { Category, IptvStream, LiveChannel, SeriesInfo, SeriesItem, StreamInfo, VodInfo, VodStream } from "../types";
 import { createLogger } from "./logger";
 
-const API_TIMEOUT_MS = 15000;
+// Big list payloads (e.g. the ~7 MB "All channels" blob) can take a while on a
+// slow line — keep this generous so the first load doesn't abort into a blank list.
+const API_TIMEOUT_MS = 30000;
 const API_HEADERS = {
 	Accept: "application/json"
 };

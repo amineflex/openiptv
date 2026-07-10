@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 interface SearchBarProps {
@@ -7,29 +8,34 @@ interface SearchBarProps {
 	placeholder?: string;
 	resultCount?: number;
 	totalCount?: number;
+	// Optional control rendered to the right of the input (e.g. a sort dropdown).
+	trailing?: ReactNode;
 }
 
-export default function SearchBar({ value, onChange, onClear, placeholder = "Search", resultCount, totalCount }: SearchBarProps) {
+export default function SearchBar({ value, onChange, onClear, placeholder = "Search", resultCount, totalCount, trailing }: SearchBarProps) {
 	return (
 		<div className="mb-5">
-			<div className="relative">
-				<MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-secondary-700" />
-				<input
-					type="text"
-					value={value}
-					onChange={(e) => onChange(e.target.value)}
-					placeholder={placeholder}
-					className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-11 text-secondary outline-none transition placeholder:text-secondary-700/60 focus:border-secondary-400 focus:bg-white/10"
-				/>
-				{value && (
-					<button
-						type="button"
-						onClick={onClear}
-						className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-secondary-700 transition hover:bg-white/10 hover:text-white"
-					>
-						<XMarkIcon className="h-5 w-5" />
-					</button>
-				)}
+			<div className="flex items-center gap-3">
+				<div className="relative min-w-0 flex-1">
+					<MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-secondary-700" />
+					<input
+						type="text"
+						value={value}
+						onChange={(e) => onChange(e.target.value)}
+						placeholder={placeholder}
+						className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-11 text-secondary outline-none transition placeholder:text-secondary-700/60 focus:border-secondary-400 focus:bg-white/10"
+					/>
+					{value && (
+						<button
+							type="button"
+							onClick={onClear}
+							className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-secondary-700 transition hover:bg-white/10 hover:text-white"
+						>
+							<XMarkIcon className="h-5 w-5" />
+						</button>
+					)}
+				</div>
+				{trailing}
 			</div>
 			{value && resultCount !== undefined && totalCount !== undefined && (
 				<p className="mt-2 text-xs text-secondary-700">

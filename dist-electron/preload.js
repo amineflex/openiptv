@@ -10,6 +10,7 @@ electron_1.contextBridge.exposeInMainWorld("openIptv", {
     releaseStreamProxy: (proxyId) => electron_1.ipcRenderer.invoke("media:release-stream-proxy", proxyId),
     probeStreamInfo: (streamUrl) => electron_1.ipcRenderer.invoke("media:probe-stream-info", streamUrl),
     stopTranscoding: () => electron_1.ipcRenderer.invoke("media:stop-transcoding"),
+    openExternal: (url) => electron_1.ipcRenderer.invoke("shell:open-external", url),
     getAppUsageStats: () => electron_1.ipcRenderer.invoke("stats:get-app-usage"),
     getFfmpegStats: () => electron_1.ipcRenderer.invoke("stats:get-ffmpeg"),
     // ── Auto-updater ────────────────────────────────────────────────────────────

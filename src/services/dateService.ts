@@ -27,6 +27,19 @@ export function getReleaseYear(value?: string | number | null): string | null {
 	return formatted?.match(/\b\d{4}\b/)?.[0] ?? null;
 }
 
+/** Format a number of seconds as H:MM:SS (or M:SS under an hour). */
+export function formatClock(totalSeconds: number): string {
+	if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return "0:00";
+
+	const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, "0");
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const hours = Math.floor(totalSeconds / 3600);
+
+	return hours > 0
+		? `${hours}:${minutes.toString().padStart(2, "0")}:${seconds}`
+		: `${minutes}:${seconds}`;
+}
+
 export function formatXtreamDate(value?: string | number | null): string {
 	if (!value) return "Unknown";
 

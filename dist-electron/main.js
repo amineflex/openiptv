@@ -151,6 +151,27 @@ function assertHttpUrl(raw) {
     }
     return raw;
 }
+// The packaged app is served from file://, an origin YouTube's embedded player
+// refuses to initialise for ("Erreur 153 / player configuration"). Present a
+// valid YouTube referer/origin on requests to YouTube hosts only, so trailer
+// embeds play while the IPTV provider requests are left untouched.
+function configureYouTubeEmbedHeaders(win) {
+    const filter = {
+        urls: [
+            "*://*.youtube.com/*",
+            "*://*.youtube-nocookie.com/*",
+            "*://*.ytimg.com/*",
+            "*://*.googlevideo.com/*"
+        ]
+    };
+    win.webContents.session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+        const requestHeaders = { ...details.requestHeaders };
+        // A valid Referer is enough; setting Origin on a frame navigation makes the
+        // embed player fail differently (error 152), so leave Origin untouched.
+        requestHeaders["Referer"] = "https://www.youtube.com/";
+        callback({ requestHeaders });
+    });
+}
 function createWindow() {
     logger.info("Creating browser window", {
         devMode: Boolean(VITE_DEV_SERVER_URL)
@@ -173,6 +194,7 @@ function createWindow() {
             enableBlinkFeatures: "AudioVideoTracks"
         }
     });
+    configureYouTubeEmbedHeaders(win);
     if (VITE_DEV_SERVER_URL) {
         void win.loadURL(VITE_DEV_SERVER_URL).catch((error) => {
             logger.exception("Failed to load dev server URL", error, {
@@ -1506,6 +1528,22 @@ async function getFfmpegServerStats() {
 }
 electron_1.ipcMain.handle("stats:get-app-usage", () => getAppUsageStats());
 electron_1.ipcMain.handle("stats:get-ffmpeg", () => getFfmpegServerStats());
+// Open an http(s) URL in the user's default browser (e.g. a trailer that the
+// in-app embed can't play). Restricted to web protocols for safety.
+electron_1.ipcMain.handle("shell:open-external", async (_event, rawUrl) => {
+    if (typeof rawUrl !== "string")
+        return { ok: false };
+    try {
+        const url = new URL(rawUrl);
+        if (url.protocol !== "http:" && url.protocol !== "https:")
+            return { ok: false };
+        await electron_1.shell.openExternal(url.toString());
+        return { ok: true };
+    }
+    catch {
+        return { ok: false };
+    }
+});
 // ── Downloads (offline, Netflix-style) ────────────────────────────────────────
 // Media is saved under <userData>/Downloads so it lives in the OS app-data dir
 // (and survives app updates). A small JSON manifest in userData tracks each

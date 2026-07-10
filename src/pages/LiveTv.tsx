@@ -2,17 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PlayCircleIcon, TvIcon } from "@heroicons/react/24/outline";
 import CategoryList from "../components/CategoryList";
-import LoadingSpinner from "../components/LoadingSpinner";
+import ChannelRowSkeleton from "../components/ChannelRowSkeleton";
 import NotFound from "../components/NotFound";
 import SearchBar from "../components/SearchBar";
+import SortSelect from "../components/SortSelect";
+import { useCachedStreams } from "../hooks/useCachedStreams";
 import { useLiveCategories } from "../hooks/useCategories";
 import { useSearch } from "../hooks/useSearch";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
 import { filterAdultItems, isAdultCategory } from "../services/adultContentFilter";
+import { BASE_SORT_OPTIONS, sortStreams } from "../services/sortStreams";
 import { generateStreamUrl } from "../services/streamService";
 import { storageService } from "../services/storageService";
 import { buildWatchRoute } from "../services/watchRoute";
+import type { SortMode } from "../services/sortStreams";
 import type { Category, ChannelSwitcherItem, GuideCategoryItem, LiveChannel } from "../types";
 
 function getChannelInitials(name: string): string {
@@ -26,11 +30,16 @@ export default function LiveTv() {
 	const stream = useStreamLoader(id);
 	const { categories } = useLiveCategories(stream);
 
-	const limit = stream?.settings.maxChannelsPerCategory ?? 200;
+	const itemsPerPage = stream?.settings.maxChannelsPerCategory ?? 200;
 	const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-	const [channels, setChannels] = useState<LiveChannel[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [visibleCount, setVisibleCount] = useState(limit);
+	const { items: channels, loading } = useCachedStreams<LiveChannel>(
+		stream,
+		selectedCategory,
+		"get_live_streams",
+		apiService.fetchLiveStreamsByCategory
+	);
+	const [page, setPage] = useState(0);
+	const [sort, setSort] = useState<SortMode>("default");
 	const adultContentEnabled = stream?.settings.adultChannel ?? false;
 	const visibleCategories = useMemo(
 		() => filterAdultItems(categories, adultContentEnabled),
@@ -53,7 +62,13 @@ export default function LiveTv() {
 		results: searchedChannels,
 		setQuery: setSearchQuery,
 		clearSearch
-	} = useSearch({ items: visibleChannels, fields: channelSearchFields });
+	} = useSearch({ items: visibleChannels, fields: channelSearchFields, persistKey: stream ? `live:${stream.id}` : undefined });
+
+	// Live channels carry no meaningful date, so only name sorts are offered.
+	const displayedChannels = useMemo(
+		() => sortStreams(searchedChannels, sort, { getName: (channel) => channel.name }),
+		[searchedChannels, sort]
+	);
 
 	useEffect(() => {
 		if (!stream) return;
@@ -62,34 +77,20 @@ export default function LiveTv() {
 	}, [stream, adultContentEnabled]);
 
 	useEffect(() => {
-		setVisibleCount(limit);
-	}, [limit, selectedCategory, searchQuery]);
+		setPage(0);
+	}, [itemsPerPage, selectedCategory, searchQuery, sort]);
 
+	// Keep the page in range if the list shrinks (e.g. a background refresh
+	// returns fewer channels) so pagination never lands on a blank page.
 	useEffect(() => {
-		if (!stream || !selectedCategory) return;
-
-		const controller = new AbortController();
-		const categoryId = selectedCategory.category_id === "all" ? undefined : selectedCategory.category_id;
-
-		const fetchChannels = async () => {
-			setLoading(true);
-			const data = await apiService.fetchLiveStreamsByCategory(stream, categoryId, controller.signal);
-
-			if (!controller.signal.aborted) {
-				setChannels(data ?? []);
-				setLoading(false);
-			}
-		};
-
-		void fetchChannels();
-
-		return () => controller.abort();
-	}, [selectedCategory, stream]);
+		const pageCount = Math.max(1, Math.ceil(displayedChannels.length / itemsPerPage));
+		if (page > pageCount - 1) setPage(pageCount - 1);
+	}, [displayedChannels.length, itemsPerPage, page]);
 
 	const channelLinks = useMemo(() => {
 		if (!stream || !selectedCategory) return [];
 
-		return searchedChannels.slice(0, visibleCount).map((channel) => {
+		return displayedChannels.slice(page * itemsPerPage, (page + 1) * itemsPerPage).map((channel) => {
 			const src = generateStreamUrl(
 				stream.domain,
 				"live",
@@ -110,7 +111,7 @@ export default function LiveTv() {
 				})
 			};
 		});
-	}, [searchedChannels, selectedCategory, stream, visibleCount]);
+	}, [displayedChannels, selectedCategory, stream, page, itemsPerPage]);
 
 	const categorySwitcherItems = useMemo<GuideCategoryItem[]>(() =>
 		visibleCategories.map((cat) => ({ id: cat.category_id, name: cat.category_name })),
@@ -174,11 +175,24 @@ export default function LiveTv() {
 							placeholder="Search channels"
 							resultCount={searchedChannels.length}
 							totalCount={visibleChannels.length}
+							trailing={<SortSelect value={sort} onChange={setSort} options={BASE_SORT_OPTIONS} />}
 						/>
 
 						{loading ? (
-							<div className="flex justify-center mt-10">
-								<LoadingSpinner />
+							<div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+								{Array.from({ length: 9 }).map((_, index) => (
+									<ChannelRowSkeleton key={index} />
+								))}
+							</div>
+						) : displayedChannels.length === 0 ? (
+							<div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+								<TvIcon className="h-14 w-14 text-primary-600" />
+								<p className="text-lg font-semibold text-white">No channels to show</p>
+								<p className="text-sm text-secondary-700">
+									{searchQuery
+										? "No channel matches your search."
+										: "This category came back empty — go back and open it again to reload."}
+								</p>
 							</div>
 						) : (
 							<div>
@@ -230,14 +244,26 @@ export default function LiveTv() {
 									))}
 								</div>
 
-								{visibleCount < searchedChannels.length && (
-									<div className="flex justify-center mt-6">
+								{displayedChannels.length > itemsPerPage && (
+									<div className="mt-8 flex items-center justify-center gap-3">
 										<button
 											type="button"
-											onClick={() => setVisibleCount((prevCount) => prevCount + limit)}
-											className="px-6 py-2 text-secondary bg-secondary-400/10 rounded-xl hover:text-secondary-400 hover:bg-secondary-400/25"
+											onClick={() => setPage((p) => Math.max(0, p - 1))}
+											disabled={page === 0}
+											className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-semibold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400 disabled:cursor-not-allowed disabled:opacity-30"
 										>
-											Load More
+											&#8592; Prev
+										</button>
+										<span className="rounded-lg bg-white/5 px-3 py-2 text-sm text-secondary-700">
+											Page <span className="font-bold text-white">{page + 1}</span> / {Math.ceil(displayedChannels.length / itemsPerPage)}
+										</span>
+										<button
+											type="button"
+											onClick={() => setPage((p) => Math.min(Math.ceil(displayedChannels.length / itemsPerPage) - 1, p + 1))}
+											disabled={page >= Math.ceil(displayedChannels.length / itemsPerPage) - 1}
+											className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 font-semibold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400 disabled:cursor-not-allowed disabled:opacity-30"
+										>
+											Next &#8594;
 										</button>
 									</div>
 								)}

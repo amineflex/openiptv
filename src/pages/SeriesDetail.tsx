@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CalendarDaysIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
+import { CalendarDaysIcon, FilmIcon, PlayCircleIcon, QueueListIcon } from "@heroicons/react/24/outline";
 import BackButton from "../components/BackButton";
 import FavouriteButton from "../components/FavouriteButton";
 import DownloadButton from "../components/DownloadButton";
 import NotFound from "../components/NotFound";
 import StarRating from "../components/StarRating";
+import TrailerModal, { extractYouTubeId } from "../components/TrailerModal";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
 import { formatReleaseDate } from "../services/dateService";
+import { progressService } from "../services/progressService";
 import { generateStreamUrl } from "../services/streamService";
 import { buildDownloadId } from "../services/downloadsService";
 import { extractSubtitleTracks } from "../services/subtitleService";
@@ -44,6 +46,7 @@ export default function SeriesDetail() {
 	const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [selectedSeason, setSelectedSeason] = useState("");
+	const [trailerOpen, setTrailerOpen] = useState(false);
 
 	useEffect(() => {
 		if (!stream || !seriesId) return;
@@ -152,6 +155,8 @@ export default function SeriesDetail() {
 	const title = seriesInfo.info.name || "Series";
 	const releaseValue = seriesInfo.info.releaseDate || seriesInfo.info.releasedate;
 	const releaseDate = formatReleaseDate(releaseValue);
+	const trailer = seriesInfo.info.youtube_trailer || "";
+	const hasTrailer = Boolean(extractYouTubeId(trailer));
 	const favouriteItem = {
 		id: seriesId,
 		streamId: stream.id,
@@ -270,7 +275,19 @@ export default function SeriesDetail() {
 								</div>
 								<h1 className="text-4xl font-bold leading-tight text-white md:text-5xl">{title}</h1>
 							</div>
-							<FavouriteButton item={favouriteItem} />
+							<div className="flex flex-none items-center gap-3">
+								{hasTrailer && (
+									<button
+										type="button"
+										onClick={() => setTrailerOpen(true)}
+										className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400"
+									>
+										<FilmIcon className="h-5 w-5" />
+										Trailer
+									</button>
+								)}
+								<FavouriteButton item={favouriteItem} />
+							</div>
 						</div>
 
 						<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
@@ -339,6 +356,10 @@ export default function SeriesDetail() {
 							if (!watchItem) return null;
 
 							const episodeDate = formatReleaseDate(episode.info?.releasedate);
+							const episodeProgress = progressService.getByUrl(stream.id, watchItem.streamUrl);
+							const episodePercent = episodeProgress && episodeProgress.duration > 0
+								? Math.min(100, (episodeProgress.position / episodeProgress.duration) * 100)
+								: 0;
 
 							return (
 								<div key={episode.id} className="relative">
@@ -348,7 +369,8 @@ export default function SeriesDetail() {
 											subtitles: watchItem.subtitles,
 											nextEpisode: nextByEpisodeId[String(episode.id)],
 											backTo: `/menu/${id}/series/v/${seriesId}`,
-											backLabel: title
+											backLabel: title,
+											resumeTime: episodeProgress?.position
 										}}
 										className="group flex min-h-[132px] gap-4 rounded-xl border border-white/10 bg-primary/10 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-secondary-400/70 hover:bg-primary/20 hover:shadow-xl hover:shadow-secondary-400/10"
 									>
@@ -362,6 +384,11 @@ export default function SeriesDetail() {
 											<div className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition group-hover:opacity-100">
 												<PlayCircleIcon className="h-11 w-11 text-secondary-400" />
 											</div>
+											{episodePercent > 0 && (
+												<div className="absolute inset-x-0 bottom-0 h-1 bg-black/50">
+													<div className="h-full bg-secondary-400" style={{ width: `${episodePercent}%` }} />
+												</div>
+											)}
 										</div>
 
 										<div className="min-w-0 flex-1 py-1">
@@ -387,6 +414,8 @@ export default function SeriesDetail() {
 					</div>
 				</section>
 			</main>
+
+			<TrailerModal open={trailerOpen} onClose={() => setTrailerOpen(false)} trailer={trailer} title={title} />
 		</div>
 	);
 }

@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { PlayIcon } from "@heroicons/react/24/outline";
+import { FilmIcon, PlayIcon } from "@heroicons/react/24/outline";
 import BackButton from "../components/BackButton";
 import FavouriteButton from "../components/FavouriteButton";
 import DownloadButton from "../components/DownloadButton";
 import NotFound from "../components/NotFound";
 import StarRating from "../components/StarRating";
+import TrailerModal, { extractYouTubeId } from "../components/TrailerModal";
 import { useStreamLoader } from "../hooks/useStreamLoader";
 import { apiService } from "../services/apiService";
-import { formatReleaseDate, getReleaseYear } from "../services/dateService";
+import { formatClock, formatReleaseDate } from "../services/dateService";
+import { progressService } from "../services/progressService";
 import { generateStreamUrl } from "../services/streamService";
 import { buildDownloadId } from "../services/downloadsService";
 import { extractSubtitleTracks } from "../services/subtitleService";
@@ -21,6 +23,7 @@ export default function Movie() {
 	const stream = useStreamLoader(id);
 	const [movieInfo, setMovieInfo] = useState<VodInfo | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [trailerOpen, setTrailerOpen] = useState(false);
 
 	useEffect(() => {
 		if (!stream || !movieId) return;
@@ -100,7 +103,6 @@ export default function Movie() {
 	const backdropUrl = Array.isArray(backdrop) ? backdrop[0] ?? "" : backdrop ?? "";
 	const movieName = movieInfo.info.name || "Movie";
 	const releaseDate = formatReleaseDate(movieInfo.info.releasedate);
-	const releaseYear = getReleaseYear(movieInfo.info.releasedate);
 	const subtitles = extractSubtitleTracks(
 		[
 			movieInfo.subtitles,
@@ -152,6 +154,13 @@ export default function Movie() {
 		subtitle: movieInfo.info.genre,
 		route: `/menu/${id}/movies/v/${movieId}`
 	};
+	const detailRoute = `/menu/${id}/movies/v/${movieId}`;
+	const progress = progressService.getByUrl(stream.id, streamUrl);
+	const progressPercent = progress && progress.duration > 0
+		? Math.min(100, (progress.position / progress.duration) * 100)
+		: 0;
+	const trailer = movieInfo.info.youtube_trailer || movieInfo.info.trailer || "";
+	const hasTrailer = Boolean(extractYouTubeId(trailer));
 
 	return (
 		<div className="relative min-h-screen bg-dark text-secondary">
@@ -179,9 +188,6 @@ export default function Movie() {
 
 						<div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
 							<StarRating value={movieInfo.info.rating} scale={10} size="md" showValue />
-							{releaseYear && (
-								<span className="rounded-full bg-white/10 px-3 py-1 font-semibold text-secondary-800">{releaseYear}</span>
-							)}
 							{releaseDate && (
 								<span className="text-secondary-700">Released {releaseDate}</span>
 							)}
@@ -197,18 +203,52 @@ export default function Movie() {
 							</div>
 						)}
 
-						<div className="mt-6 flex flex-wrap items-center gap-3">
-							<Link
-								to={watchRoute}
-								state={{ subtitles, backTo: `/menu/${id}/movies/v/${movieId}`, backLabel: movieName }}
-								className="inline-flex items-center gap-2 rounded-xl bg-secondary-400 px-7 py-3 text-base font-bold text-dark shadow-lg shadow-secondary-400/30 transition hover:scale-105 hover:bg-secondary"
-							>
-								<PlayIcon className="h-5 w-5" />
-								Watch Now
-							</Link>
-							<FavouriteButton item={favouriteItem} />
-							<DownloadButton item={downloadItem} />
+						<div className="mt-6 flex flex-col gap-3">
+							<div className="flex flex-wrap items-center gap-3">
+								<Link
+									to={watchRoute}
+									state={{ subtitles, backTo: detailRoute, backLabel: movieName, resumeTime: progress?.position }}
+									className="inline-flex items-center gap-2 rounded-xl bg-secondary-400 px-7 py-3 text-base font-bold text-dark shadow-lg shadow-secondary-400/30 transition hover:scale-105 hover:bg-secondary"
+								>
+									<PlayIcon className="h-5 w-5" />
+									{progress ? `Resume · ${formatClock(progress.position)}` : "Watch Now"}
+								</Link>
+								{progress && (
+									<Link
+										to={watchRoute}
+										state={{ subtitles, backTo: detailRoute, backLabel: movieName, resumeTime: 0 }}
+										className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400"
+									>
+										Start over
+									</Link>
+								)}
+								{hasTrailer && (
+									<button
+										type="button"
+										onClick={() => setTrailerOpen(true)}
+										className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-secondary transition hover:border-secondary-400/50 hover:text-secondary-400"
+									>
+										<FilmIcon className="h-5 w-5" />
+										Trailer
+									</button>
+								)}
+							</div>
+							<div className="flex flex-wrap items-center gap-3">
+								<FavouriteButton item={favouriteItem} />
+								<DownloadButton item={downloadItem} />
+							</div>
 						</div>
+
+						{progress && progress.duration > 0 && (
+							<div className="mt-4 max-w-md">
+								<div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+									<div className="h-full rounded-full bg-secondary-400" style={{ width: `${progressPercent}%` }} />
+								</div>
+								<p className="mt-1.5 text-xs text-secondary-700">
+									{formatClock(progress.position)} / {formatClock(progress.duration)} watched
+								</p>
+							</div>
+						)}
 
 						{movieInfo.info.plot && (
 							<p className="mt-7 max-w-2xl leading-relaxed text-secondary-800">{movieInfo.info.plot}</p>
@@ -216,6 +256,8 @@ export default function Movie() {
 					</div>
 				</div>
 			</div>
+
+			<TrailerModal open={trailerOpen} onClose={() => setTrailerOpen(false)} trailer={trailer} title={movieName} />
 		</div>
 	);
 }

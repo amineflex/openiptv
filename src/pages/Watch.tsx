@@ -22,6 +22,7 @@ interface WatchState {
 	profileId?: string;
 	backTo?: string;
 	backLabel?: string;
+	resumeTime?: number;
 }
 
 export default function Watch() {
@@ -31,6 +32,7 @@ export default function Watch() {
 	const params = new URLSearchParams(location.search);
 	const streamUrl = params.get("src");
 	const type = (params.get("type") ?? "vod") as ContentType;
+	const streamId = state?.profileId ?? parseStreamId(state?.backTo);
 
 	const channelInfo = {
 		type,
@@ -53,8 +55,6 @@ export default function Watch() {
 	// — including channel zapping, which re-navigates here with new params.
 	useEffect(() => {
 		if (!streamUrl) return;
-
-		const streamId = state?.profileId ?? parseStreamId(state?.backTo);
 		if (!streamId) return;
 
 		const watchUrl = `${location.pathname}${location.search}`;
@@ -89,7 +89,7 @@ export default function Watch() {
 		}
 
 		historyService.record(entry);
-	}, [streamUrl, type, channelInfo.name, channelInfo.category, channelInfo.icon, state?.backTo, state?.profileId, location.pathname, location.search]);
+	}, [streamUrl, streamId, type, channelInfo.name, channelInfo.category, channelInfo.icon, state?.backTo, location.pathname, location.search]);
 
 	if (channelInfo.type === "live_tv") {
 		return (
@@ -114,6 +114,8 @@ export default function Watch() {
 			nextEpisode={state?.nextEpisode}
 			backTo={state?.backTo}
 			backLabel={state?.backLabel}
+			streamId={streamId ?? undefined}
+			resumeTime={state?.resumeTime}
 		/>
 	);
 }
