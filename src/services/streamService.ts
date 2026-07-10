@@ -37,7 +37,21 @@ export function startStream(videoElement: HTMLVideoElement | null, streamUrl: st
 
 		const player = mpegts.createPlayer({
 			type: "mpegts",
+			isLive: true,
 			url: streamUrl
+		}, {
+			enableWorker: true,
+			lazyLoad: false,
+			// Disable aggressive latency chasing to stop the video from jumping (flickering)
+			liveBufferLatencyChasing: false,
+			// Re-enable stash buffer to smooth out network jitters and stop frequent loading freezes
+			enableStashBuffer: true,
+			stashInitialSize: 256 * 1024, // 256KB for quick start but stable playback
+			fixAudioTimestampGap: true,
+			autoCleanupSourceBuffer: true,
+			autoCleanupMaxBackwardDuration: 30,
+			autoCleanupMinBackwardDuration: 15,
+			reuseRedirectedURL: true
 		});
 
 		player.attachMediaElement(videoElement);

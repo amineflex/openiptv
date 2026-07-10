@@ -20,6 +20,7 @@ import { storageService } from "../services/storageService";
 import { streamCache } from "../services/streamCache";
 import { historyService } from "../services/historyService";
 import type { IptvStream, StreamInput, StreamSettings } from "../types";
+import pkg from "../../package.json";
 
 type StreamField = keyof StreamInput;
 type SettingField = keyof StreamSettings;
@@ -452,7 +453,24 @@ export default function Settings() {
 					</section>
 				</div>
 
-
+				<footer className="mt-12 flex justify-center pb-4">
+					{(() => {
+						const p = window.openIptv?.platformInfo;
+						const platformName = p?.platform === "win32" ? "Windows" : p?.platform === "darwin" ? "macOS" : p?.platform === "linux" ? "Linux" : p?.platform;
+						const archName = p?.arch === "x64" ? "x86-64" : p?.arch === "arm64" ? "ARM64" : p?.arch === "ia32" ? "x86" : p?.arch;
+						return (
+							<div className="inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/[0.02] px-4 py-1.5 shadow-sm">
+								<span className="text-[10px] font-black uppercase tracking-widest text-secondary-700">OpenIPTV v{pkg.version}</span>
+								{p && (
+									<>
+										<span className="text-white/20">·</span>
+										<span className="text-[10px] font-bold tracking-wide text-secondary-800">{platformName} {archName}</span>
+									</>
+								)}
+							</div>
+						);
+					})()}
+				</footer>
 			</form>
 		</div>
 	);

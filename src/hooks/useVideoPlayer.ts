@@ -536,12 +536,14 @@ export function useVideoPlayer(
 				// suspending the connection when the buffer looks "full" — we want
 				// to build the deepest lead the transcoder can give us.
 				lazyLoad: false,
-				// Hold a bigger IO stash so a transient producer hiccup (the CPU
-				// spike from the parallel subtitle ffmpeg, or the buffer draining
-				// twice as fast at 2× speed) doesn't immediately starve the demuxer
-				// and trip a stall. Default is 64 KiB.
+				// Hold a smaller initial stash to reduce the Time-To-First-Byte (TTFB) 
+				// and start playback almost instantly, while keeping stashBuffer enabled
+				// to prevent stuttering later. 128KB instead of 1MB.
 				enableStashBuffer: true,
-				stashInitialSize: 1024 * 1024,
+				stashInitialSize: 128 * 1024,
+				// Fix audio timestamp gaps which are common in IPTV streams and cause freezing.
+				fixAudioTimestampGap: true,
+				deferLoadAfterSourceOpen: false,
 				// Trim already-played media so a long movie's SourceBuffer can't grow
 				// unbounded and cause GC hitches mid-playback, while keeping a roomy
 				// backward window so short rewinds stay instant.

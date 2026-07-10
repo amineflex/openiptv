@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
-import { InformationCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { InformationCircleIcon, XMarkIcon, ClipboardDocumentIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import type {
 	AppUsageStats,
@@ -127,6 +127,20 @@ function barColor(percent: number): string {
 	if (percent >= 80) return "bg-red-500";
 	if (percent >= 60) return "bg-amber-400";
 	return "bg-secondary-400";
+}
+
+function getStreamHealth(stats: VideoStats | null): { status: string; color: string; desc: string } {
+	if (!stats || stats.decodedFrames === 0) return { status: "Analyzing...", color: "bg-gray-500", desc: "Waiting for data" };
+	const total = stats.decodedFrames + stats.droppedFrames;
+	const dropRate = total > 0 ? (stats.droppedFrames / total) * 100 : 0;
+	
+	if (dropRate > 5 || (stats.bufferSec > 0 && stats.bufferSec < 0.5)) {
+		return { status: "Poor", color: "bg-red-500", desc: "Frame drops or critical buffer" };
+	}
+	if (dropRate > 1 || (stats.bufferSec > 0 && stats.bufferSec < 2)) {
+		return { status: "Unstable", color: "bg-amber-400", desc: "Micro-stutters detected" };
+	}
+	return { status: "Excellent", color: "bg-green-400", desc: "Smooth and stable stream" };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -299,6 +313,32 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 	const [appStats, setAppStats] = useState<AppUsageStats | null>(null);
 	const [ffmpegStats, setFfmpegStats] = useState<FfmpegServerStats | null>(null);
 	const [videoStats, setVideoStats] = useState<VideoStats | null>(null);
+	const [copied, setCopied] = useState(false);
+
+	const handleCopyDebug = async () => {
+		const engine = videoRef?.current?.src.startsWith("blob:") ? "MPEG-TS (MSE)" : "Native HTML5 Player";
+		const debugInfo = [
+			"=== OPENIPTV DEBUG INFO ===",
+			`Stream URL: ${streamUrl}`,
+			`Health: ${getStreamHealth(videoStats).status} (${getStreamHealth(videoStats).desc})`,
+			`Video Engine: ${engine}`,
+			`CPU: ${appStats?.cpuPercent ?? 0}% | RAM: ${appStats ? formatMB(appStats.ramMB) : "N/A"}`,
+			`Network: ${appStats ? formatKbps(appStats.networkKbps) : "N/A"}`,
+			`Decoded Frames: ${videoStats?.decodedFrames ?? 0} | Dropped: ${videoStats?.droppedFrames ?? 0}`,
+			`Buffer: ${videoStats?.bufferSec.toFixed(2) ?? "0.00"}s`,
+			`FFmpeg Active: ${((ffmpegStats?.activeSessionCount ?? 0) > 0) ? "Yes" : "No"}`,
+			"=== FORMAT ===",
+			info?.format ? JSON.stringify(info.format, null, 2) : "N/A",
+		].join("\n");
+		
+		try {
+			await navigator.clipboard.writeText(debugInfo);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		} catch (err) {
+			console.error("Failed to copy", err);
+		}
+	};
 
 	// Probe stream info (static, once per open+url)
 	useEffect(() => {
@@ -402,6 +442,33 @@ export default function StreamInfoPanel({ open, streamUrl, onClose, videoRef }: 
 						>
 							<XMarkIcon className="h-5 w-5" />
 						</button>
+					</div>
+
+					{/* Debug actions & Health */}
+					<div className="border-b border-white/[0.07] bg-primary/5 px-5 py-3">
+						<div className="mb-3 flex items-center justify-between">
+							<div className="flex items-center gap-2">
+								<span className={`h-2.5 w-2.5 rounded-full ${getStreamHealth(videoStats).color} shadow-[0_0_8px_rgba(0,0,0,0.5)]`} />
+								<div>
+									<div className="text-sm font-bold text-white">{getStreamHealth(videoStats).status}</div>
+									<div className="text-[10px] uppercase tracking-wide text-gray-500">{getStreamHealth(videoStats).desc}</div>
+								</div>
+							</div>
+							<button
+								type="button"
+								onClick={() => void handleCopyDebug()}
+								className="flex items-center gap-1.5 rounded-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+							>
+								{copied ? <CheckIcon className="h-4 w-4 text-green-400" /> : <ClipboardDocumentIcon className="h-4 w-4" />}
+								{copied ? "Copied!" : "Copy Debug"}
+							</button>
+						</div>
+						<div className="flex items-center justify-between rounded-lg bg-black/40 px-3 py-2">
+							<span className="text-xs text-gray-400">Video Engine</span>
+							<span className="text-xs font-semibold text-secondary-400">
+								{videoRef?.current?.src.startsWith("blob:") ? "MPEG-TS (MSE)" : "Native HTML5 Player"}
+							</span>
+						</div>
 					</div>
 
 					{/* Body */}
