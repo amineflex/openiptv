@@ -1,6 +1,6 @@
 {
 	"name": "openiptvclient",
-	"version": "1.2.1",
+	"version": "1.2.2",
 	"description": "A simple IPTV client using Electron and React",
 	"main": "dist-electron/main.js",
 	"scripts": {
