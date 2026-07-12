@@ -1,4 +1,4 @@
-const ADULT_KEYWORDS = ["adult", "18+", "xxx", "erotic", "porn", "x-rated", "18 ", "+18", "xxx"];
+const ADULT_KEYWORDS = ["adult", "18+", "xxx", "erotic", "porn", "x-rated", "18 ", "+18"];
 
 export function isAdultCategory(item: { category_name?: string; name?: string }): boolean {
 	const name = (item.category_name ?? item.name ?? "").toLowerCase();

@@ -36,8 +36,17 @@ export default function Movies() {
 	const [page, setPage] = useState(0);
 	const [sort, setSort] = useState<SortMode>("default");
 	const adultContentEnabled = stream?.settings.adultChannel ?? false;
-	const visibleCategories = filterAdultItems(categories, adultContentEnabled);
-	const visibleVods = filterAdultItems(vods, adultContentEnabled, selectedVodCategory?.category_name);
+	// Memoized so the filtered arrays keep a stable reference between renders —
+	// otherwise a fresh array each render would defeat useSearch's debounce and
+	// re-run the O(n) scoring/sort over the whole category on every keystroke.
+	const visibleCategories = useMemo(
+		() => filterAdultItems(categories, adultContentEnabled),
+		[categories, adultContentEnabled]
+	);
+	const visibleVods = useMemo(
+		() => filterAdultItems(vods, adultContentEnabled, selectedVodCategory?.category_name),
+		[vods, adultContentEnabled, selectedVodCategory]
+	);
 	const vodSearchFields = useMemo(
 		() => [
 			{ getValue: (vod: VodStream) => vod.name, weight: 3 },

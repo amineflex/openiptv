@@ -36,8 +36,17 @@ export default function Series() {
 	const [page, setPage] = useState(0);
 	const [sort, setSort] = useState<SortMode>("default");
 	const adultContentEnabled = stream?.settings.adultChannel ?? false;
-	const visibleCategories = filterAdultItems(categories, adultContentEnabled);
-	const visibleSeries = filterAdultItems(series, adultContentEnabled, selectedSerieCategory?.category_name);
+	// Memoized so the filtered arrays keep a stable reference between renders —
+	// otherwise a fresh array each render would defeat useSearch's debounce and
+	// re-run the O(n) scoring/sort over the whole category on every keystroke.
+	const visibleCategories = useMemo(
+		() => filterAdultItems(categories, adultContentEnabled),
+		[categories, adultContentEnabled]
+	);
+	const visibleSeries = useMemo(
+		() => filterAdultItems(series, adultContentEnabled, selectedSerieCategory?.category_name),
+		[series, adultContentEnabled, selectedSerieCategory]
+	);
 	const seriesSearchFields = useMemo(
 		() => [
 			{ getValue: (serie: SeriesItem) => serie.name, weight: 3 },

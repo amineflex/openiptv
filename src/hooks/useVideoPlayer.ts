@@ -259,6 +259,7 @@ export function useVideoPlayer(
 	const stallRecoverAttemptsRef = useRef(0);
 	const transcodePlayerRef = useRef<mpegts.Player | null>(null);
 	const playbackRateRef = useRef(1);
+	const volumeRef = useRef(1);
 	const transcodeBaseUrlRef = useRef<string | null>(null);
 	const resolvedStreamUrlRef = useRef<string | null>(null);
 	const selectedTranscodeAudioIndexRef = useRef(0);
@@ -337,6 +338,10 @@ export function useVideoPlayer(
 	useEffect(() => {
 		burnSubtitleIndexRef.current = burnSubtitleIndex;
 	}, [burnSubtitleIndex]);
+
+	useEffect(() => {
+		volumeRef.current = volume;
+	}, [volume]);
 
 	useEffect(() => {
 		playbackRateRef.current = playbackRate;
@@ -520,7 +525,9 @@ export function useVideoPlayer(
 		const video = videoRef.current;
 		if (!video || type !== "vod" || !playableStreamUrl) return;
 
-		video.volume = volume;
+		// Read via ref: this effect isn't keyed on volume, so a stale closure value
+		// would otherwise be applied when the stream reloads.
+		video.volume = volumeRef.current;
 		lastLocalTimeRef.current = 0;
 		transcodePlayerRef.current?.destroy();
 		transcodePlayerRef.current = null;
