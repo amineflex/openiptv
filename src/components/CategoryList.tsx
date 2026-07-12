@@ -20,7 +20,7 @@ export default function CategoryList({ categories, selectedCategory, handleCateg
 				onClick={() => handleCategorySelect(category)}
 				className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
 					isActive
-						? "bg-secondary-400 text-dark shadow-lg shadow-secondary-400/20"
+						? "bg-gradient-to-r from-secondary-400 to-indigo-400 text-dark shadow-lg shadow-secondary-400/30"
 						: "text-secondary-800 hover:bg-white/5 hover:text-white"
 				}`}
 			>
@@ -30,7 +30,7 @@ export default function CategoryList({ categories, selectedCategory, handleCateg
 	};
 
 	return (
-		<aside className="flex h-screen w-56 flex-none flex-col border-r border-white/10 bg-white/[0.02] md:w-64 2xl:w-80">
+		<aside className="glass-panel flex h-screen w-56 flex-none flex-col border-r-0 md:w-64 2xl:w-80 z-10">
 			<header className="flex items-center gap-3 border-b border-white/10 px-4 py-5">
 				<Link
 					to={backLink}

@@ -170,8 +170,8 @@ export default function Menu() {
 		<div className="relative min-h-screen overflow-hidden bg-dark text-secondary">
 			{/* Ambient blobs — scaled up on large screens */}
 			<div className="pointer-events-none absolute inset-0">
-				<div className="absolute -top-32 right-1/4 h-[32rem] w-[32rem] rounded-full bg-secondary-400/10 blur-3xl 2xl:h-[52rem] 2xl:w-[52rem]" />
-				<div className="absolute -bottom-20 left-0 h-80 w-80 rounded-full bg-primary/20 blur-3xl 2xl:h-[30rem] 2xl:w-[30rem]" />
+				<div className="absolute -top-32 right-1/4 h-[32rem] w-[32rem] rounded-full bg-secondary-400/10 blur-3xl animate-pulse-slow 2xl:h-[52rem] 2xl:w-[52rem]" />
+				<div className="absolute -bottom-20 left-0 h-80 w-80 rounded-full bg-primary/20 blur-3xl animate-pulse-slow 2xl:h-[30rem] 2xl:w-[30rem]" style={{ animationDelay: "2s" }} />
 			</div>
 
 			{/* Content — wider container on 2K/4K */}
@@ -218,8 +218,8 @@ export default function Menu() {
 								key={to}
 								to={to}
 								className={[
-									"group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition duration-200",
-									"hover:-translate-y-1 hover:border-secondary-400/40 hover:shadow-2xl hover:shadow-black/40",
+									"glass group relative flex flex-col justify-between overflow-hidden rounded-2xl p-6 transition-all duration-300",
+									"hover:-translate-y-2 hover:border-secondary-400/60 hover:shadow-2xl hover:shadow-secondary-400/20",
 									"focus:outline-none focus:ring-2 focus:ring-secondary-400",
 									"min-h-80 2xl:min-h-0",
 									// On 2xl: Live TV spans both rows in the left column
@@ -247,7 +247,7 @@ export default function Menu() {
 					<aside className="flex flex-col gap-4 2xl:gap-5">
 						<Link
 							to="account"
-							className="group rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-7 min-[2560px]:p-9"
+							className="glass group rounded-2xl p-6 transition hover:border-secondary-400/50 hover:bg-secondary-400/10 focus:outline-none focus:ring-2 focus:ring-secondary-400 2xl:p-7 min-[2560px]:p-9"
 						>
 							<div className="flex items-center gap-3">
 								<UserCircleIcon className="h-9 w-9 flex-none text-secondary-400 transition group-hover:text-secondary 2xl:h-11 2xl:w-11 min-[2560px]:h-14 min-[2560px]:w-14" />
@@ -269,7 +269,7 @@ export default function Menu() {
 							<Link
 								key={to}
 								to={to}
-								className={`group flex items-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-br to-transparent p-6 backdrop-blur transition focus:outline-none focus:ring-2 2xl:gap-4 2xl:p-7 min-[2560px]:gap-5 min-[2560px]:p-9 ${card}`}
+								className={`glass group flex items-center gap-3 rounded-2xl p-6 transition focus:outline-none focus:ring-2 2xl:gap-4 2xl:p-7 min-[2560px]:gap-5 min-[2560px]:p-9 ${card}`}
 							>
 								<span className={`flex h-11 w-11 flex-none items-center justify-center rounded-xl transition 2xl:h-12 2xl:w-12 min-[2560px]:h-16 min-[2560px]:w-16 ${chip}`}>
 									<Icon className="h-6 w-6 2xl:h-7 2xl:w-7 min-[2560px]:h-9 min-[2560px]:w-9" />

@@ -71,7 +71,7 @@ export default function StreamCard({ stream, onEdit, onDelete }: StreamCardProps
 		<div className="group relative">
 			<Link
 				to={`/menu/${stream.id}`}
-				className="flex h-full min-h-[190px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-br from-primary/30 to-dark/40 p-6 text-center shadow-lg shadow-black/30 transition duration-200 hover:-translate-y-1 hover:border-secondary-400/60 hover:shadow-xl hover:shadow-secondary-400/20"
+				className="glass flex h-full min-h-[190px] flex-col items-center justify-center gap-3 rounded-2xl p-6 text-center transition-all duration-300 hover:-translate-y-2 hover:border-secondary-400/60 hover:shadow-2xl hover:shadow-secondary-400/30"
 			>
 				<span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary-400/15 text-secondary-400 ring-1 ring-secondary-400/30 transition group-hover:bg-secondary-400 group-hover:text-dark">
 					<TvIcon className="h-8 w-8" />

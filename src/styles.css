@@ -168,12 +168,27 @@ video::cue {
 }
 
 /* ----------------------------------------------------------------------------
-   Reusable polish helpers
+   Reusable polish helpers & Premium UI aesthetics
 ---------------------------------------------------------------------------- */
 @layer components {
 	/* Soft fade-in for page content. */
 	.fade-in {
 		animation: fade-in 0.35s ease both;
+	}
+
+	/* Glassmorphism base effect */
+	.glass {
+		@apply bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+	}
+
+	/* Slightly denser glass for panels/sidebars */
+	.glass-panel {
+		@apply bg-dark/60 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)];
+	}
+
+	/* Vibrant text gradient */
+	.text-gradient {
+		@apply bg-clip-text text-transparent bg-gradient-to-r from-secondary-400 to-indigo-400;
 	}
 }
 
