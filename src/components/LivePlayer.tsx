@@ -102,6 +102,22 @@ export default function LivePlayer({
 				return;
 			}
 
+			// HLS (.m3u8) can't go through mpegts.js. Route the playlist through the
+			// main-process HLS reverse-proxy (CORS + segment rewriting) and hand it to
+			// hls.js. No audio-transcode resolution here: hls.js drives the browser's
+			// own decoders, same as native playback.
+			if (/\.m3u8(?:$|\?)/i.test(streamUrl)) {
+				let playbackUrl = streamUrl;
+				if (window.openIptv?.createHlsProxy) {
+					const result = await window.openIptv.createHlsProxy(streamUrl);
+					if (cancelled) return;
+					if (result?.ok && result.url) playbackUrl = result.url;
+				}
+				if (cancelled) return;
+				mpegtsRef.current = startStream(videoRef.current, playbackUrl, true);
+				return;
+			}
+
 			// AC3/E-AC3/DTS live audio is undecodable by mpegts.js (silent channel).
 			// Ask the main process to resolve it: it transcodes just the audio to AAC
 			// (copying the video) and hands back a local MPEG-TS URL when needed.

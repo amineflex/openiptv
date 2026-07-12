@@ -7,6 +7,7 @@ electron_1.contextBridge.exposeInMainWorld("openIptv", {
     resolvePlayableStream: (streamUrl) => electron_1.ipcRenderer.invoke("media:resolve-playable-stream", streamUrl),
     resolveLiveStream: (streamUrl) => electron_1.ipcRenderer.invoke("media:resolve-live-stream", streamUrl),
     createStreamProxy: (streamUrl) => electron_1.ipcRenderer.invoke("media:create-stream-proxy", streamUrl),
+    createHlsProxy: (streamUrl) => electron_1.ipcRenderer.invoke("media:create-hls-proxy", streamUrl),
     releaseStreamProxy: (proxyId) => electron_1.ipcRenderer.invoke("media:release-stream-proxy", proxyId),
     probeStreamInfo: (streamUrl) => electron_1.ipcRenderer.invoke("media:probe-stream-info", streamUrl),
     stopTranscoding: () => electron_1.ipcRenderer.invoke("media:stop-transcoding"),

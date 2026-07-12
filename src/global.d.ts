@@ -28,6 +28,7 @@ declare global {
 			resolvePlayableStream: (streamUrl: string) => Promise<PlayableStreamResult>;
 			resolveLiveStream: (streamUrl: string) => Promise<LiveStreamResult>;
 			createStreamProxy: (streamUrl: string) => Promise<StreamProxyResult>;
+			createHlsProxy: (streamUrl: string) => Promise<StreamProxyResult>;
 			releaseStreamProxy: (proxyId: string) => Promise<{ ok: boolean }>;
 			probeStreamInfo: (streamUrl: string) => Promise<StreamInfoResult>;
 			stopTranscoding: () => Promise<{ ok: boolean }>;

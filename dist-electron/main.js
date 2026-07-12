@@ -318,6 +318,11 @@ const UNSUPPORTED_BROWSER_AUDIO_CODECS = new Set(["ac3", "eac3", "truehd", "dts"
 const MSE_COPYABLE_VIDEO_CODECS = new Set(["h264"]);
 const transcodeSources = new Map();
 const streamProxySources = new Map();
+// Hosts the HLS reverse-proxy is allowed to fetch from. Seeded with a playlist's
+// host when a session is created, then grown with every host referenced inside a
+// playlist we rewrite — so segments on a separate CDN keep working while the
+// (127.0.0.1-only) endpoint never becomes a fully open proxy for arbitrary hosts.
+const hlsProxyAllowedHosts = new Set();
 let transcodeServer = null;
 let transcodeServerPort = null;
 const mediaUsageCounters = new Map();
@@ -657,6 +662,138 @@ function handleStreamProxyRequest(request, response, requestUrl) {
     });
     openRemoteStream(sourceUrl);
 }
+// ── HLS reverse-proxy ────────────────────────────────────────────────────────
+// mpegts.js can't play HLS (.m3u8), so live channels served as HLS go through
+// hls.js in the renderer. hls.js fetches the playlist and its segments from the
+// renderer's origin, which the IPTV provider usually blocks with CORS — and the
+// byte-passthrough /stream proxy can't help because a playlist points at many
+// segment URLs. This endpoint fetches the playlist, rewrites every segment/key
+// URI to come back through itself (adding CORS), and streams segments through.
+function looksLikeHlsPlaylist(contentType, url, body) {
+    const ct = (contentType ?? "").toLowerCase();
+    if (ct.includes("mpegurl"))
+        return true;
+    if (/\.m3u8(?:$|\?)/i.test(url.pathname + url.search))
+        return true;
+    return body !== undefined && body.trimStart().startsWith("#EXTM3U");
+}
+function rewriteHlsPlaylist(body, baseUrl, proxyBase) {
+    const toProxied = (raw) => {
+        try {
+            const absolute = new URL(raw, baseUrl);
+            hlsProxyAllowedHosts.add(absolute.host);
+            return `${proxyBase}${encodeURIComponent(absolute.toString())}`;
+        }
+        catch {
+            return raw;
+        }
+    };
+    return body
+        .split(/\r?\n/)
+        .map((line) => {
+        const trimmed = line.trim();
+        if (trimmed === "")
+            return line;
+        // Tag line — rewrite any URI="…" attribute (EXT-X-KEY, EXT-X-MEDIA,
+        // EXT-X-MAP, EXT-X-I-FRAME-STREAM-INF).
+        if (trimmed.startsWith("#")) {
+            return line.replace(/URI="([^"]+)"/g, (_match, uri) => `URI="${toProxied(uri)}"`);
+        }
+        // Otherwise it's a segment or a sub-/variant-playlist URI.
+        return toProxied(trimmed);
+    })
+        .join("\n");
+}
+function handleHlsProxyRequest(request, response, requestUrl) {
+    if (request.method === "OPTIONS") {
+        response.writeHead(204, {
+            "Access-Control-Allow-Headers": "Range, Content-Type, User-Agent",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Max-Age": "86400"
+        });
+        response.end();
+        return;
+    }
+    const rawTarget = requestUrl.searchParams.get("u");
+    let target;
+    try {
+        target = new URL(assertHttpUrl(rawTarget));
+    }
+    catch {
+        response.writeHead(400);
+        response.end();
+        return;
+    }
+    // Only proxy hosts reached through a playlist we already opened.
+    if (!hlsProxyAllowedHosts.has(target.host)) {
+        logger.warn("Rejected HLS proxy request for an unregistered host", { host: target.host });
+        response.writeHead(403);
+        response.end();
+        return;
+    }
+    const proxyBase = `http://127.0.0.1:${transcodeServerPort}/hls?u=`;
+    const openRemote = (remote, redirectCount = 0) => {
+        const transport = remote.protocol === "https:" ? https_1.default : http_1.default;
+        const proxyRequest = transport.request(remote, {
+            method: request.method === "HEAD" ? "HEAD" : "GET",
+            headers: createForwardHeaders(request.headers, remote)
+        }, (proxyResponse) => {
+            const statusCode = proxyResponse.statusCode ?? 200;
+            const redirectLocation = proxyResponse.headers.location;
+            if (redirectLocation && [301, 302, 303, 307, 308].includes(statusCode) && redirectCount < 5) {
+                proxyResponse.resume();
+                openRemote(new URL(redirectLocation, remote), redirectCount + 1);
+                return;
+            }
+            const contentType = proxyResponse.headers["content-type"];
+            if (request.method !== "HEAD" && looksLikeHlsPlaylist(contentType, remote)) {
+                // Buffer the (small) playlist so we can rewrite its URIs.
+                const chunks = [];
+                proxyResponse.on("data", (chunk) => chunks.push(chunk));
+                proxyResponse.on("end", () => {
+                    const body = Buffer.concat(chunks).toString("utf8");
+                    if (!body.trimStart().startsWith("#EXTM3U")) {
+                        // Mislabeled — pass the bytes through untouched.
+                        response.writeHead(statusCode, createResponseHeaders(proxyResponse.headers));
+                        response.end(Buffer.concat(chunks));
+                        return;
+                    }
+                    const rewritten = Buffer.from(rewriteHlsPlaylist(body, remote, proxyBase), "utf8");
+                    response.writeHead(200, {
+                        "Access-Control-Allow-Origin": "*",
+                        "Cache-Control": "no-store",
+                        "Content-Type": "application/vnd.apple.mpegurl",
+                        "Content-Length": rewritten.length
+                    });
+                    response.end(rewritten);
+                });
+                proxyResponse.on("error", () => { if (!response.headersSent)
+                    response.writeHead(502); response.end(); });
+                return;
+            }
+            // Segment / key / init bytes — stream straight through with CORS.
+            response.writeHead(statusCode, proxyResponse.statusMessage, createResponseHeaders(proxyResponse.headers));
+            proxyResponse.pipe(response);
+            proxyResponse.on("error", () => response.end());
+        });
+        proxyRequest.on("error", (error) => {
+            logger.warn("HLS proxy request failed", { error: error.message, url: remote.toString() });
+            if (!response.headersSent)
+                response.writeHead(502);
+            response.end();
+        });
+        request.on("aborted", () => proxyRequest.destroy());
+        response.on("close", () => proxyRequest.destroy());
+        proxyRequest.end();
+    };
+    openRemote(target);
+}
+async function createHlsProxyUrl(sourceUrl) {
+    const port = await ensureTranscodeServer();
+    hlsProxyAllowedHosts.add(new URL(sourceUrl).host);
+    return { url: `http://127.0.0.1:${port}/hls?u=${encodeURIComponent(sourceUrl)}` };
+}
 function killTranscode(proc) {
     activeTranscodes.delete(proc);
     activeTranscodeInfos.delete(proc);
@@ -839,6 +976,10 @@ function ensureTranscodeServer() {
             const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
             if (requestUrl.pathname.startsWith("/stream/")) {
                 handleStreamProxyRequest(request, response, requestUrl);
+                return;
+            }
+            if (requestUrl.pathname === "/hls") {
+                handleHlsProxyRequest(request, response, requestUrl);
                 return;
             }
             if (requestUrl.pathname.startsWith("/download-sub/")) {
@@ -1129,6 +1270,23 @@ electron_1.ipcMain.handle("media:create-stream-proxy", async (_event, rawUrl) =>
             url,
             error: error instanceof Error ? error.message : "Failed to create stream proxy"
         };
+    }
+});
+electron_1.ipcMain.handle("media:create-hls-proxy", async (_event, rawUrl) => {
+    let url;
+    try {
+        url = assertHttpUrl(rawUrl);
+    }
+    catch (error) {
+        return { ok: false, url: "", error: error instanceof Error ? error.message : "Invalid URL" };
+    }
+    try {
+        const proxy = await createHlsProxyUrl(url);
+        return { ok: true, url: proxy.url };
+    }
+    catch (error) {
+        logger.exception("Failed to create HLS proxy", error, { url });
+        return { ok: false, url, error: error instanceof Error ? error.message : "Failed to create HLS proxy" };
     }
 });
 electron_1.ipcMain.handle("media:release-stream-proxy", (_event, rawId) => {

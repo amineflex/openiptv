@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld("openIptv", {
 	createStreamProxy: (streamUrl: string) =>
 		ipcRenderer.invoke("media:create-stream-proxy", streamUrl),
 
+	createHlsProxy: (streamUrl: string) =>
+		ipcRenderer.invoke("media:create-hls-proxy", streamUrl),
+
 	releaseStreamProxy: (proxyId: string) =>
 		ipcRenderer.invoke("media:release-stream-proxy", proxyId),
 
