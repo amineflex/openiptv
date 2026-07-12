@@ -136,7 +136,7 @@ export default function Favourites() {
 										type="button"
 										onClick={() => removeFavourite(item)}
 										title="Remove from favourites"
-										className="rounded-full bg-dark/70 p-2 text-white opacity-0 backdrop-blur transition hover:bg-red-600 group-hover:opacity-100"
+										className="invisible rounded-full bg-dark/70 p-2 text-white opacity-0 backdrop-blur transition hover:bg-red-600 focus:visible focus:opacity-100 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
 									>
 										<TrashIcon className="h-5 w-5" />
 									</button>

@@ -14,12 +14,21 @@ import History from "./pages/History";
 import Downloads from "./pages/Downloads";
 import AccountInfo from "./pages/AccountInfo";
 import UpdateNotifier from "./components/UpdateNotifier";
+import { useSpatialNavigation } from "./hooks/useSpatialNavigation";
+
+// Enables arrow-key navigation across the whole UI. Lives inside <Router> so it
+// can read the current route (navigation is handed off to the players on /watch).
+function SpatialNavigation() {
+	useSpatialNavigation();
+	return null;
+}
 
 export default function App() {
 	return (
 		<>
 			<UpdateNotifier />
 			<Router>
+				<SpatialNavigation />
 				<Routes>
 					<Route path="/" element={<Home />} />
 					<Route path="/menu/:id" element={<Menu />} />

@@ -36,6 +36,19 @@
 		border-radius: 6px;
 	}
 
+	/* TV-style highlight applied by the spatial (arrow-key) navigation engine.
+	   Stronger than the default ring so the focused tile is obvious from across
+	   the room, and guaranteed to show even where :focus-visible heuristics vary. */
+	.snav-focused {
+		outline: 3px solid #9181ff !important;
+		outline-offset: 2px;
+		box-shadow: 0 0 0 6px rgba(145, 129, 255, 0.25), 0 8px 30px rgba(0, 0, 0, 0.45);
+		border-radius: 12px;
+		scroll-margin: 96px;
+		position: relative;
+		z-index: 5;
+	}
+
 	/* Smooth, consistent hover feedback across every link and button. */
 	a,
 	button {

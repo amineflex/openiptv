@@ -90,7 +90,7 @@ export default function StreamCard({ stream, onEdit, onDelete }: StreamCardProps
 				</span>
 			</Link>
 
-			<div className="absolute right-3 top-3 flex gap-1.5 opacity-0 transition duration-150 group-hover:opacity-100">
+			<div className="invisible absolute right-3 top-3 flex gap-1.5 opacity-0 transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
 				<button
 					type="button"
 					onClick={() => onEdit(stream)}

@@ -231,7 +231,7 @@ export default function History() {
 										type="button"
 										onClick={() => removeItem(item)}
 										title="Remove from history"
-										className="absolute right-2 top-2 z-30 rounded-full bg-dark/70 p-1.5 text-white opacity-0 backdrop-blur transition hover:bg-red-600 group-hover:opacity-100"
+										className="invisible absolute right-2 top-2 z-30 rounded-full bg-dark/70 p-1.5 text-white opacity-0 backdrop-blur transition hover:bg-red-600 focus:visible focus:opacity-100 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
 									>
 										<TrashIcon className="h-4 w-4" />
 									</button>
